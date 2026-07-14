@@ -5,7 +5,9 @@
 CREATE TABLE IF NOT EXISTS admins (
     id            VARCHAR(36)  PRIMARY KEY,
     email         VARCHAR(320) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL
+    password_hash VARCHAR(255) NOT NULL,
+    -- 'super' for the first admin created during onboarding, else 'admin'.
+    role          VARCHAR(16)  NOT NULL DEFAULT 'admin'
 );
 
 -- End users: the people who sign in to relying apps through this SSO

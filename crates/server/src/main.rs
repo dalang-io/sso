@@ -43,7 +43,12 @@ async fn main() -> anyhow::Result<()> {
     warn_on_insecure_defaults(&config);
 
     let db = Db::connect(&config.database_url, config.database_max_connections).await?;
-    bootstrap_admin(&db, &config).await?;
+    if db.count_admins().await? == 0 {
+        tracing::info!(
+            "no admin yet — open {}/setup to create the super admin",
+            config.issuer()
+        );
+    }
 
     let signer = Signer::from_config(
         &config.token_signing_alg,
@@ -69,22 +74,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Seed the first admin account so a fresh instance is immediately usable.
-async fn bootstrap_admin(db: &Db, config: &Config) -> anyhow::Result<()> {
-    if db.count_admins().await? == 0 {
-        db.create_admin(&config.admin_email, &config.admin_password)
-            .await?;
-        tracing::info!(email = %config.admin_email, "bootstrapped initial admin account");
-    }
-    Ok(())
-}
-
 fn warn_on_insecure_defaults(config: &Config) {
     if config.session_secret.starts_with("dev-insecure") {
         tracing::warn!("SSO_SESSION_SECRET is a dev default — set a strong secret for production");
-    }
-    if config.admin_password == "admin" {
-        tracing::warn!("SSO_ADMIN_PASSWORD is 'admin' — change it before exposing the dashboard");
     }
 }
 

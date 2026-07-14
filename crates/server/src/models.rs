@@ -12,6 +12,14 @@ pub struct Admin {
     pub email: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
+    /// `super` for the onboarding-created first admin, otherwise `admin`.
+    pub role: String,
+}
+
+impl Admin {
+    pub fn is_super(&self) -> bool {
+        self.role == "super"
+    }
 }
 
 /// An end user who authenticates to relying apps via this SSO. Distinct from

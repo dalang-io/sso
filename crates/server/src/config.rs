@@ -19,8 +19,6 @@ pub struct Config {
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
     pub auth_code_ttl: Duration,
-    pub admin_email: String,
-    pub admin_password: String,
 }
 
 impl Config {
@@ -43,8 +41,6 @@ impl Config {
             access_token_ttl: secs("SSO_ACCESS_TOKEN_TTL", 3600),
             refresh_token_ttl: secs("SSO_REFRESH_TOKEN_TTL", 2_592_000),
             auth_code_ttl: secs("SSO_AUTH_CODE_TTL", 600),
-            admin_email: env_or("SSO_ADMIN_EMAIL", "admin@example.com"),
-            admin_password: env_or("SSO_ADMIN_PASSWORD", "admin"),
         })
     }
 

@@ -6,20 +6,31 @@ use crate::error::{AppError, AppResult};
 use crate::models::Client;
 use crate::state::AppState;
 use axum::extract::{Path, State};
-use axum::response::{Html, IntoResponse, Redirect};
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
 use axum_extra::extract::cookie::SignedCookieJar;
 use minijinja::context;
 use serde::Deserialize;
 
-pub async fn list(State(state): State<AppState>, jar: SignedCookieJar) -> AppResult<Html<String>> {
-    let admin = require_admin(&state, &jar).await?;
+pub async fn list(State(state): State<AppState>, jar: SignedCookieJar) -> AppResult<Response> {
+    // Unauthenticated visitors go to onboarding (no admin yet) or login.
+    let admin = match super::current_admin(&state, &jar).await {
+        Some(a) => a,
+        None => {
+            let to = if state.db.count_admins().await? == 0 {
+                "/setup"
+            } else {
+                "/login"
+            };
+            return Ok(Redirect::to(to).into_response());
+        }
+    };
     let clients = state.db.list_clients().await?;
     let body = state.render(
         "clients.html",
-        context! { admin_email => admin.email, clients => clients },
+        context! { admin_email => admin.email, admin_role => admin.role, clients => clients },
     )?;
-    Ok(Html(body))
+    Ok(Html(body).into_response())
 }
 
 #[derive(Deserialize)]

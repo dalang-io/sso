@@ -82,7 +82,10 @@ impl Db {
         // Best-effort additive migrations for columns added after the initial
         // schema. On a fresh DB the column already exists and the ALTER errors
         // (duplicate column) — which is expected and ignored.
-        for alter in ["ALTER TABLE clients ADD COLUMN allowed_emails TEXT NOT NULL DEFAULT '[]'"] {
+        for alter in [
+            "ALTER TABLE clients ADD COLUMN allowed_emails TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE admins ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'admin'",
+        ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
         Ok(())
@@ -116,41 +119,46 @@ impl Db {
         Ok(row.try_get::<i64, _>("c")?)
     }
 
-    pub async fn create_admin(&self, email: &str, password: &str) -> anyhow::Result<()> {
-        let sql = self.q("INSERT INTO admins (id, email, password_hash) VALUES (?, ?, ?)");
+    /// Create an admin with the given role (`super` or `admin`).
+    pub async fn create_admin(
+        &self,
+        email: &str,
+        password: &str,
+        role: &str,
+    ) -> anyhow::Result<Admin> {
+        let admin = Admin {
+            id: uuid::Uuid::new_v4().to_string(),
+            email: email.to_string(),
+            password_hash: crypto::hash_secret(password)?,
+            role: role.to_string(),
+        };
+        let sql = self.q("INSERT INTO admins (id, email, password_hash, role) VALUES (?, ?, ?, ?)");
         sqlx::query(&sql)
-            .bind(uuid::Uuid::new_v4().to_string())
-            .bind(email)
-            .bind(crypto::hash_secret(password)?)
+            .bind(&admin.id)
+            .bind(&admin.email)
+            .bind(&admin.password_hash)
+            .bind(&admin.role)
             .execute(&self.pool)
             .await?;
-        Ok(())
+        Ok(admin)
     }
 
     pub async fn admin_by_email(&self, email: &str) -> anyhow::Result<Option<Admin>> {
-        let sql = self.q("SELECT id, email, password_hash FROM admins WHERE email = ?");
+        let sql = self.q("SELECT * FROM admins WHERE email = ?");
         let row = sqlx::query(&sql)
             .bind(email)
             .fetch_optional(&self.pool)
             .await?;
-        Ok(row.map(|r| Admin {
-            id: r.get("id"),
-            email: r.get("email"),
-            password_hash: r.get("password_hash"),
-        }))
+        Ok(row.map(|r| row_to_admin(&r)))
     }
 
     pub async fn admin_by_id(&self, id: &str) -> anyhow::Result<Option<Admin>> {
-        let sql = self.q("SELECT id, email, password_hash FROM admins WHERE id = ?");
+        let sql = self.q("SELECT * FROM admins WHERE id = ?");
         let row = sqlx::query(&sql)
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
-        Ok(row.map(|r| Admin {
-            id: r.get("id"),
-            email: r.get("email"),
-            password_hash: r.get("password_hash"),
-        }))
+        Ok(row.map(|r| row_to_admin(&r)))
     }
 
     // ---- end users ---------------------------------------------------------
@@ -364,6 +372,16 @@ fn row_to_client(r: &AnyRow) -> Client {
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
         allowed_emails: serde_json::from_str(&emails).unwrap_or_default(),
         created_at: r.get("created_at"),
+    }
+}
+
+fn row_to_admin(r: &AnyRow) -> Admin {
+    Admin {
+        id: r.get("id"),
+        email: r.get("email"),
+        password_hash: r.get("password_hash"),
+        // Tolerant of pre-migration rows lacking the column.
+        role: r.try_get("role").unwrap_or_else(|_| "admin".into()),
     }
 }
 
