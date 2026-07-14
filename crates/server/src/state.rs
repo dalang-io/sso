@@ -32,6 +32,9 @@ impl AppState {
         let mut env = build_templates();
         env.add_global("brand_title", brand.title.clone());
         env.add_global("favicon_mime", brand.favicon.content_type.clone());
+        // Content-hash appended to asset URLs (?v=…) so each build/asset change
+        // gets a fresh URL — long cache TTLs stay safe behind any CDN.
+        env.add_global("asset_version", brand.fingerprint());
 
         Self {
             config: Arc::new(config),

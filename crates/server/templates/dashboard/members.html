@@ -53,7 +53,7 @@
         <td style="text-align:right">
           {% if m.id != self_id and m.role != "super" %}
           <form method="post" action="/dashboard/members/{{ m.id }}/delete"
-                onsubmit="return confirm('Remove {{ m.email }}?');">
+                data-confirm="Remove member {{ m.email }}?">
             <button class="link-danger">Remove</button>
           </form>
           {% endif %}

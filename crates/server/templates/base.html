@@ -6,14 +6,14 @@
   <title>{% block title %}{{ brand_title }}{% endblock %}</title>
   <!-- Everything is served locally (no CDN / external fonts) so the UI works in
        airgapped deployments. Favicon + logo are configurable via env. -->
-  <link rel="icon" href="/assets/favicon" type="{{ favicon_mime }}" />
-  <link rel="stylesheet" href="/assets/app.css" />
+  <link rel="icon" href="/assets/favicon?v={{ asset_version }}" type="{{ favicon_mime }}" />
+  <link rel="stylesheet" href="/assets/app.css?v={{ asset_version }}" />
 </head>
 <body>
   <header class="site-header">
     <div class="container">
       <a href="/dashboard" class="brand">
-        <img src="/assets/logo" alt="{{ brand_title }} logo" />
+        <img src="/assets/logo?v={{ asset_version }}" alt="{{ brand_title }} logo" />
         {{ brand_title }}
       </a>
       {% if admin_email %}
@@ -37,5 +37,48 @@
   <main class="container main">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Type-to-confirm deletion guard. Any <form data-confirm="…"> is intercepted;
+       the action only fires after the user types DELETE. Inline + no external
+       deps (airgap-safe). -->
+  <div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Confirm deletion</h2>
+      <p class="small" id="confirmMsg"></p>
+      <p class="hint">Type <span class="type-target">DELETE</span> to confirm. This cannot be undone.</p>
+      <input class="input" id="confirmInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="DELETE" />
+      <div class="row between mt">
+        <button class="btn btn-secondary btn-sm" type="button" id="confirmCancel">Cancel</button>
+        <button class="btn btn-danger btn-sm" type="button" id="confirmOk" disabled>Delete</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var modal = document.getElementById('confirmModal'),
+        msg = document.getElementById('confirmMsg'),
+        input = document.getElementById('confirmInput'),
+        ok = document.getElementById('confirmOk'),
+        cancel = document.getElementById('confirmCancel'),
+        pending = null;
+    function close() { modal.classList.remove('open'); input.value = ''; ok.disabled = true; pending = null; }
+    input.addEventListener('input', function () { ok.disabled = input.value.trim() !== 'DELETE'; });
+    cancel.addEventListener('click', close);
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
+    ok.addEventListener('click', function () {
+      if (input.value.trim() === 'DELETE' && pending) { var f = pending; close(); f.submit(); }
+    });
+    document.querySelectorAll('form[data-confirm]').forEach(function (f) {
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        pending = f;
+        msg.textContent = f.getAttribute('data-confirm');
+        modal.classList.add('open');
+        input.focus();
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

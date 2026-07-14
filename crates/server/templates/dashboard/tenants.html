@@ -25,7 +25,7 @@
         <td class="muted small">{{ t.created_at[:10] }}</td>
         <td style="text-align:right">
           <form method="post" action="/dashboard/tenants/{{ t.id }}/delete"
-                onsubmit="return confirm('Delete tenant {{ t.name }}?');">
+                data-confirm="Delete tenant {{ t.name }}?">
             <button class="link-danger">Delete</button>
           </form>
         </td>

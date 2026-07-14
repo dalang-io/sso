@@ -30,7 +30,7 @@
         <div class="tiny muted">Created {{ s.created_at[:10] }} at {{ s.created_at[11:19] }} UTC</div>
       </div>
       <form method="post" action="/dashboard/clients/{{ client.id }}/secrets/{{ s.id }}/delete"
-            onsubmit="return confirm('Delete this secret? Apps still using it will stop authenticating.');">
+            data-confirm="Delete secret {{ s.hint }}? Apps still using it will stop authenticating.">
         <button class="link-danger">Delete</button>
       </form>
     </li>
@@ -84,9 +84,14 @@
   </div>
   <div class="row between">
     <button class="btn btn-primary">Save</button>
-    <button class="link-danger" formaction="/dashboard/clients/{{ client.id }}/delete"
-            onsubmit="return confirm('Delete this client?');">Delete client</button>
   </div>
+</form>
+
+<!-- Delete client lives in its own form so the type-to-confirm guard doesn't
+     intercept the Save action above. -->
+<form method="post" action="/dashboard/clients/{{ client.id }}/delete" class="mt"
+      data-confirm="Delete client {{ client.name }} and all its secrets?">
+  <button class="link-danger">Delete client</button>
 </form>
 {% endif %}
 {% endblock %}

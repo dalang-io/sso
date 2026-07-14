@@ -15,7 +15,7 @@ use axum::routing::get;
 use axum::Router;
 use std::sync::Arc;
 
-const APP_CSS: &str = include_str!("../static/app.css");
+pub(crate) const APP_CSS: &str = include_str!("../static/app.css");
 /// Bundled fallback logo (downloaded from https://dalang.io/logo.webp).
 const DEFAULT_LOGO: &[u8] = include_bytes!("../static/logo.webp");
 
@@ -64,6 +64,18 @@ impl Brand {
             logo: BrandAsset::load(config.logo_path.as_deref()),
             favicon: BrandAsset::load(config.favicon_path.as_deref()),
         }
+    }
+
+    /// Short content hash of all assets. Appended as `?v=` to asset URLs so a
+    /// redeploy (or a changed custom logo) busts any CDN/browser cache while the
+    /// assets themselves stay long-lived.
+    pub fn fingerprint(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(APP_CSS.as_bytes());
+        h.update(&*self.logo.bytes);
+        h.update(&*self.favicon.bytes);
+        hex::encode(&h.finalize()[..6])
     }
 }
 
