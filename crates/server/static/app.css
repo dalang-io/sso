@@ -4,11 +4,12 @@
    press-on-hover buttons, sharp corners. */
 
 :root {
-  --ink: #111827;
+  --ink: #0f172a;
   --black: #000000;
   --white: #ffffff;
-  --paper: #f5f5f4;
-  --muted: #6b7280;
+  --paper: #f4f4f2;
+  /* darkened for contrast (≈7:1 on paper) — was #6b7280 */
+  --muted: #475569;
   --line: #000000;
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
@@ -42,17 +43,20 @@ body {
   font-family: var(--font);
   color: var(--ink);
   background: var(--paper);
-  /* subtle brutalist grid texture */
-  background-image:
-    linear-gradient(var(--gray-200) 1px, transparent 1px),
-    linear-gradient(90deg, var(--gray-200) 1px, transparent 1px);
-  background-size: 32px 32px;
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Visible keyboard focus for accessibility. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+textarea:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--primary-hover);
+  outline-offset: 2px;
+}
 
 code, pre, .mono { font-family: var(--mono); }
 
@@ -168,7 +172,7 @@ p { margin: 0 0 0.75rem; }
 .hero { padding: 3.5rem 0 2.5rem; }
 .hero .eyebrow { margin-bottom: 1rem; }
 .hero h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; max-width: 18ch; }
-.hero .lede { font-size: 1.15rem; color: var(--muted); max-width: 60ch; margin: 1rem 0 1.75rem; }
+.hero .lede { font-size: 1.2rem; line-height: 1.6; color: #334155; max-width: 58ch; margin: 1rem 0 1.75rem; }
 .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
 .section { padding: 2.5rem 0; }
@@ -178,8 +182,8 @@ p { margin: 0 0 0.75rem; }
 @media (min-width: 980px) { .feature-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .feature { background: var(--white); border: 2px solid var(--black); box-shadow: var(--shadow); padding: 1.25rem; }
 .feature .ico { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 2px solid var(--black); background: var(--primary); font-size: 1.15rem; margin-bottom: 0.75rem; }
-.feature h3 { font-size: 1rem; font-weight: 800; margin: 0 0 0.35rem; }
-.feature p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+.feature h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 0.4rem; }
+.feature p { font-size: 0.95rem; line-height: 1.6; color: #334155; margin: 0; }
 
 .band { border-top: 2px solid var(--black); border-bottom: 2px solid var(--black); background: var(--primary); }
 .band .container { padding: 2.5rem 1.5rem; }
@@ -198,8 +202,9 @@ p { margin: 0 0 0.75rem; }
 .docs-nav a:hover { color: var(--primary-hover); text-decoration: none; }
 .docs-body h2 { font-size: 1.5rem; font-weight: 800; color: var(--ink); text-transform: none; letter-spacing: -0.01em; margin: 2.5rem 0 0.75rem; padding-top: 0.5rem; border-top: 2px solid var(--gray-200); }
 .docs-body h2:first-child { margin-top: 0; border-top: none; }
-.docs-body h3 { font-size: 1.05rem; font-weight: 800; margin: 1.5rem 0 0.5rem; }
-.docs-body p, .docs-body li { color: #374151; font-size: 0.95rem; }
+.docs-body h3 { font-size: 1.15rem; font-weight: 800; margin: 1.5rem 0 0.5rem; }
+.docs-body p, .docs-body li { color: #1f2937; font-size: 1.02rem; line-height: 1.75; }
+.docs-body li { margin-bottom: 0.35rem; }
 .docs-body pre { background: var(--gray-100); border: 2px solid var(--black); padding: 0.85rem 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; margin: 0.75rem 0; }
 .docs-body code:not(pre code) { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 0.05rem 0.3rem; font-family: var(--mono); font-size: 0.85em; }
 .docs-body table { width: 100%; border-collapse: collapse; border: 2px solid var(--black); margin: 0.75rem 0; font-size: 0.85rem; }
