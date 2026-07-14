@@ -74,6 +74,11 @@ fn build_templates() -> Environment<'static> {
         .unwrap();
     env.add_template("setup.html", include_str!("../templates/setup.html"))
         .unwrap();
+    // Public site pages (rendered so their asset URLs get the ?v= cache-buster).
+    env.add_template("site_index.html", include_str!("../../../site/index.html"))
+        .unwrap();
+    env.add_template("site_docs.html", include_str!("../../../site/docs.html"))
+        .unwrap();
     env.add_template(
         "tenants.html",
         include_str!("../templates/dashboard/tenants.html"),
