@@ -159,6 +159,56 @@ p { margin: 0 0 0.75rem; }
 .count { border: 2px solid var(--black); background: var(--gray-100); padding: 0.05rem 0.4rem; font-size: 0.72rem; font-weight: 800; }
 .table-scroll { overflow-x: auto; }
 
+/* ============================ landing + docs ============================ */
+.btn-lg { padding: 0.7rem 1.4rem; font-size: 0.95rem; }
+.wrap-nav { display: flex; gap: 1.25rem; align-items: center; }
+.wrap-nav a { color: var(--black); font-weight: 700; font-size: 0.9rem; }
+.wrap-nav a:hover { color: var(--primary-hover); text-decoration: none; }
+
+.hero { padding: 3.5rem 0 2.5rem; }
+.hero .eyebrow { margin-bottom: 1rem; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; max-width: 18ch; }
+.hero .lede { font-size: 1.15rem; color: var(--muted); max-width: 60ch; margin: 1rem 0 1.75rem; }
+.hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+.section { padding: 2.5rem 0; }
+.section-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+.feature-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 980px) { .feature-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.feature { background: var(--white); border: 2px solid var(--black); box-shadow: var(--shadow); padding: 1.25rem; }
+.feature .ico { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 2px solid var(--black); background: var(--primary); font-size: 1.15rem; margin-bottom: 0.75rem; }
+.feature h3 { font-size: 1rem; font-weight: 800; margin: 0 0 0.35rem; }
+.feature p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+
+.band { border-top: 2px solid var(--black); border-bottom: 2px solid var(--black); background: var(--primary); }
+.band .container { padding: 2.5rem 1.5rem; }
+
+.terminal { background: #111827; color: #f9fafb; border: 2px solid var(--black); box-shadow: var(--shadow); padding: 1rem 1.25rem; font-family: var(--mono); font-size: 0.85rem; overflow-x: auto; }
+.terminal .c { color: #9ca3af; }
+.terminal .g { color: #facc15; }
+
+/* docs layout */
+.docs { display: grid; gap: 2rem; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 900px) { .docs { grid-template-columns: 15rem 1fr; } }
+.docs-nav { position: sticky; top: 1.5rem; border: 2px solid var(--black); background: var(--white); padding: 1rem; }
+.docs-nav strong { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.75rem 0 0.35rem; }
+.docs-nav strong:first-child { margin-top: 0; }
+.docs-nav a { display: block; font-size: 0.85rem; padding: 0.15rem 0; color: var(--black); }
+.docs-nav a:hover { color: var(--primary-hover); text-decoration: none; }
+.docs-body h2 { font-size: 1.5rem; font-weight: 800; color: var(--ink); text-transform: none; letter-spacing: -0.01em; margin: 2.5rem 0 0.75rem; padding-top: 0.5rem; border-top: 2px solid var(--gray-200); }
+.docs-body h2:first-child { margin-top: 0; border-top: none; }
+.docs-body h3 { font-size: 1.05rem; font-weight: 800; margin: 1.5rem 0 0.5rem; }
+.docs-body p, .docs-body li { color: #374151; font-size: 0.95rem; }
+.docs-body pre { background: var(--gray-100); border: 2px solid var(--black); padding: 0.85rem 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; margin: 0.75rem 0; }
+.docs-body code:not(pre code) { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 0.05rem 0.3rem; font-family: var(--mono); font-size: 0.85em; }
+.docs-body table { width: 100%; border-collapse: collapse; border: 2px solid var(--black); margin: 0.75rem 0; font-size: 0.85rem; }
+.docs-body th { background: var(--gray-50); border-bottom: 2px solid var(--black); text-align: left; padding: 0.5rem 0.75rem; }
+.docs-body td { border-bottom: 1px solid var(--gray-200); padding: 0.5rem 0.75rem; }
+
+.site-footer { border-top: 2px solid var(--black); background: var(--white); }
+.site-footer .container { padding: 2rem 1.5rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: var(--muted); }
+
 /* ---- confirm-delete modal ---- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
 .modal-overlay.open { display: flex; }

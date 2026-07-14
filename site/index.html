@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dalang SSO — the open-source Keycloak alternative (OAuth 2.0 / OIDC)</title>
+  <meta name="description" content="Dalang SSO is a lightweight, self-hosted, open-source Keycloak alternative. OAuth 2.0 / OpenID Connect provider in Rust: multi-tenant RBAC, post-quantum tokens, SDKs for 6 languages, runs airgapped, any database. A single 7 MB binary." />
+  <link rel="canonical" href="https://sso.dalang.io/" />
+  <link rel="icon" href="/assets/favicon" />
+  <link rel="stylesheet" href="/assets/app.css" />
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Dalang SSO" />
+  <meta property="og:title" content="Dalang SSO — the open-source Keycloak alternative" />
+  <meta property="og:description" content="Self-hosted OAuth 2.0 / OIDC provider in Rust. Multi-tenant RBAC, post-quantum tokens, 6-language SDKs, airgap-ready. One small binary — not a JVM." />
+  <meta property="og:url" content="https://sso.dalang.io/" />
+  <meta property="og:image" content="https://sso.dalang.io/assets/logo" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Dalang SSO — open-source Keycloak alternative" />
+  <meta name="twitter:description" content="Self-hosted OAuth 2.0 / OIDC in Rust. Multi-tenant, post-quantum, 6 SDKs, airgap-ready." />
+  <meta name="keywords" content="keycloak alternative, open source SSO, self-hosted OAuth2, OpenID Connect provider, identity provider, IdP, rust auth, multi-tenant SSO, post-quantum authentication" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Structured data: helps search + AI engines (GEO) understand & cite this. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Dalang SSO",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Linux, macOS, Windows",
+    "description": "Open-source, self-hosted OAuth 2.0 / OpenID Connect identity provider written in Rust — a lightweight Keycloak alternative with multi-tenant RBAC, post-quantum token signing, and SDKs for JavaScript, Rust, Go, Python, Java and PHP.",
+    "url": "https://sso.dalang.io/",
+    "downloadUrl": "https://github.com/dalang-io/sso/releases",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "softwareVersion": "0.1.0",
+    "author": { "@type": "Organization", "name": "Dalang", "url": "https://dalang.io" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "Is Dalang SSO a Keycloak alternative?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Dalang SSO is an open-source, self-hosted OAuth 2.0 / OpenID Connect provider that covers the core identity-provider use cases of Keycloak — client registration, login, consent, tokens, JWKS, UserInfo — as a single small Rust binary instead of a JVM application." } },
+      { "@type": "Question", "name": "Does Dalang SSO work in an airgapped environment?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The dashboard ships no CDN or external font dependencies; all assets are served locally, and the whole app is one static binary with an embedded SQLite database by default." } },
+      { "@type": "Question", "name": "What databases does Dalang SSO support?",
+        "acceptedAnswer": { "@type": "Answer", "text": "SQLite by default (zero setup), plus PostgreSQL and MySQL/MariaDB selected at runtime via the DATABASE_URL. No recompile needed to switch." } },
+      { "@type": "Question", "name": "Is Dalang SSO post-quantum secure?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Optionally. Token signing can be switched to ML-DSA (FIPS 204) so access and id tokens are quantum-resistant; the classical RS256 default keeps maximum interop." } }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="brand"><img src="/assets/logo" alt="Dalang SSO logo" /> Dalang SSO</a>
+      <nav class="wrap-nav">
+        <a href="/docs">Docs</a>
+        <a href="https://github.com/dalang-io/sso">GitHub</a>
+        <a href="/login" class="btn btn-sm btn-secondary">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="container hero">
+      <span class="eyebrow">Open-source · Apache-2.0</span>
+      <h1>The open-source Keycloak alternative.</h1>
+      <p class="lede">
+        A self-hosted <strong>OAuth 2.0 / OpenID Connect</strong> provider in Rust — your own
+        “Sign in with…”, on your domain. Multi-tenant RBAC, post-quantum tokens, SDKs for six
+        languages, and airgap-ready. One <strong>7&nbsp;MB binary</strong>, not a JVM.
+      </p>
+      <div class="hero-cta">
+        <a href="/docs" class="btn btn-primary btn-lg">Get started</a>
+        <a href="https://github.com/dalang-io/sso/releases" class="btn btn-secondary btn-lg">Download binary</a>
+        <a href="https://github.com/dalang-io/sso" class="btn btn-secondary btn-lg">★ Star on GitHub</a>
+      </div>
+    </section>
+
+    <section class="container section">
+      <div class="feature-grid">
+        <div class="feature"><div class="ico">🔑</div><h3>OAuth 2.0 &amp; OIDC</h3><p>Authorization Code + PKCE, refresh rotation, client credentials, discovery, JWKS, UserInfo. Standards-compliant.</p></div>
+        <div class="feature"><div class="ico">🏢</div><h3>Multi-tenant RBAC</h3><p>Isolated tenants with super / manager / developer roles. Managers own their clients; developers only rotate secrets.</p></div>
+        <div class="feature"><div class="ico">🔐</div><h3>Post-quantum ready</h3><p>Optional ML-DSA (FIPS 204) token signing. Argon2 + SHA-256 hashing. Hybrid ML-KEM at the TLS edge.</p></div>
+        <div class="feature"><div class="ico">📦</div><h3>SDKs for 6 languages</h3><p>JavaScript/TypeScript, Rust, Go, Python, Java, PHP — PKCE, token exchange, refresh, UserInfo, all consistent.</p></div>
+        <div class="feature"><div class="ico">🗄️</div><h3>Any database</h3><p>SQLite by default (zero setup). PostgreSQL, MySQL &amp; MariaDB by config. No recompile to switch.</p></div>
+        <div class="feature"><div class="ico">✈️</div><h3>Airgap &amp; tiny</h3><p>No CDN, no external fonts, one static binary with an embedded dashboard. Runs where the internet doesn’t reach.</p></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="container">
+        <h2 class="section-title" style="margin-bottom:0.5rem">Dalang SSO vs. Keycloak</h2>
+        <p class="small" style="margin-bottom:1.25rem">Both are open-source identity providers. Dalang trades breadth for a small, fast, operable core.</p>
+        <div class="table-scroll">
+          <table class="table" style="box-shadow:none">
+            <thead><tr><th>&nbsp;</th><th>Dalang SSO</th><th>Keycloak</th></tr></thead>
+            <tbody>
+              <tr><td>Runtime</td><td><strong>Single ~7&nbsp;MB binary</strong></td><td>JVM (hundreds of MB)</td></tr>
+              <tr><td>Cold start</td><td><strong>Milliseconds</strong></td><td>Tens of seconds</td></tr>
+              <tr><td>Default database</td><td><strong>Embedded SQLite</strong></td><td>External RDBMS</td></tr>
+              <tr><td>Post-quantum tokens</td><td><strong>Built-in (ML-DSA)</strong></td><td>Not built-in</td></tr>
+              <tr><td>Airgap-friendly</td><td><strong>Yes, by design</strong></td><td>Possible, heavier</td></tr>
+              <tr><td>First-run</td><td><strong>Web onboarding</strong></td><td>Admin bootstrap</td></tr>
+              <tr><td>License</td><td>Apache-2.0</td><td>Apache-2.0</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section">
+      <h2 class="section-title">Running in 60 seconds</h2>
+      <div class="terminal">
+<span class="c"># download the latest release binary (or `cargo build --release`)</span>
+curl -L <span class="g">https://github.com/dalang-io/sso/releases/latest/download/sso-linux-x86_64</span> -o sso
+chmod +x sso && ./sso
+<span class="c"># open http://localhost:8080 → create your super admin → add an OAuth client</span>
+      </div>
+      <p class="small mt">Then drop an SDK into your app and run the Authorization Code + PKCE flow against your instance. Full walkthrough in the <a href="/docs">docs</a>.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>© Dalang · Apache-2.0 · <a href="https://github.com/dalang-io/sso">github.com/dalang-io/sso</a></span>
+      <span><a href="/docs">Docs</a> · <a href="/llms.txt">llms.txt</a> · <a href="/.well-known/openid-configuration">OIDC discovery</a></span>
+    </div>
+  </footer>
+</body>
+</html>

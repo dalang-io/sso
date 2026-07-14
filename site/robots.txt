@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /$
+Allow: /docs
+Allow: /llms.txt
+# Application surfaces are not useful to index.
+Disallow: /dashboard
+Disallow: /login
+Disallow: /setup
+Disallow: /oauth/
+
+Sitemap: https://sso.dalang.io/sitemap.xml

@@ -18,10 +18,10 @@ mod error;
 mod models;
 mod oauth;
 mod signing;
+mod site;
 mod state;
 mod web;
 
-use axum::response::Redirect;
 use axum::routing::get;
 use axum::Router;
 use config::Config;
@@ -63,8 +63,8 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState::new(config, db, signer);
 
     let app = Router::new()
-        .route("/", get(|| async { Redirect::to("/dashboard") }))
         .route("/health", get(|| async { "ok" }))
+        .merge(site::router())
         .merge(assets::router())
         .merge(oauth::router())
         .merge(web::router())

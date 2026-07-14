@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docs — Dalang SSO (open-source Keycloak alternative)</title>
+  <meta name="description" content="Developer documentation for Dalang SSO: quickstart, OAuth 2.0 / OIDC endpoints, multi-tenant roles, SDK usage for 6 languages, configuration, and self-hosting." />
+  <link rel="canonical" href="https://sso.dalang.io/docs" />
+  <link rel="icon" href="/assets/favicon" />
+  <link rel="stylesheet" href="/assets/app.css" />
+  <meta property="og:title" content="Dalang SSO — Developer Documentation" />
+  <meta property="og:description" content="Quickstart, endpoints, roles, SDKs and self-hosting for the open-source Keycloak alternative." />
+  <meta property="og:url" content="https://sso.dalang.io/docs" />
+  <meta name="robots" content="index, follow" />
+  <script type="application/ld+json">
+  { "@context":"https://schema.org","@type":"TechArticle","headline":"Dalang SSO Developer Documentation",
+    "description":"Quickstart, OAuth 2.0/OIDC endpoints, multi-tenant roles, SDK usage and self-hosting for Dalang SSO.",
+    "url":"https://sso.dalang.io/docs","author":{"@type":"Organization","name":"Dalang"} }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="brand"><img src="/assets/logo" alt="Dalang SSO logo" /> Dalang SSO</a>
+      <nav class="wrap-nav">
+        <a href="/docs">Docs</a>
+        <a href="https://github.com/dalang-io/sso">GitHub</a>
+        <a href="/login" class="btn btn-sm btn-secondary">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container main">
+    <div class="docs">
+      <nav class="docs-nav">
+        <strong>Start</strong>
+        <a href="#what">What is Dalang SSO</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#concepts">Tenants &amp; roles</a>
+        <strong>Integrate</strong>
+        <a href="#flow">The OAuth flow</a>
+        <a href="#endpoints">Endpoints</a>
+        <a href="#sdks">SDKs</a>
+        <strong>Operate</strong>
+        <a href="#config">Configuration</a>
+        <a href="#deploy">Self-hosting</a>
+        <a href="#pqc">Post-quantum</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
+      <article class="docs-body">
+        <h2 id="what">What is Dalang SSO</h2>
+        <p>Dalang SSO is a self-hosted, open-source <strong>OAuth 2.0 / OpenID Connect</strong> identity
+        provider written in Rust — a lightweight alternative to Keycloak. You register OAuth clients in a
+        dashboard, get a <code>client_id</code> and <code>client_secret</code>, and your apps sign users in
+        against your own domain. It runs as a single static binary with an embedded SQLite database, works
+        airgapped, and ships client SDKs for six languages.</p>
+
+        <h2 id="quickstart">Quickstart</h2>
+        <h3>1 · Run the server</h3>
+        <pre># Pre-built binary (see the GitHub Releases page for your platform)
+curl -L https://github.com/dalang-io/sso/releases/latest/download/sso-linux-x86_64 -o sso
+chmod +x sso &amp;&amp; ./sso
+
+# …or build from source (Rust 1.90+)
+git clone https://github.com/dalang-io/sso &amp;&amp; cd sso
+cargo run -p sso-server</pre>
+        <p>Open <code>http://localhost:8080</code>. The first visit sends you to <code>/setup</code> to create
+        the <strong>super admin</strong> (one-time onboarding).</p>
+
+        <h3>2 · Create an OAuth client</h3>
+        <p>In the dashboard: create a client, add an <em>Authorized redirect URI</em> (e.g.
+        <code>https://app.example.com/callback</code>), and copy the <code>client_id</code> +
+        <code>client_secret</code> (shown once).</p>
+
+        <h3>3 · Sign users in</h3>
+        <p>Use an SDK (below) or hit the endpoints directly. The default flow is Authorization Code + PKCE.</p>
+
+        <h2 id="concepts">Tenants &amp; roles</h2>
+        <p>Dalang SSO is multi-tenant. A <strong>tenant</strong> is an isolated workspace that owns its OAuth
+        clients. Dashboard users (members) have a role:</p>
+        <table>
+          <thead><tr><th>Role</th><th>Scope</th><th>Can do</th></tr></thead>
+          <tbody>
+            <tr><td><strong>super</strong></td><td>Global</td><td>Manage tenants &amp; members; all clients/secrets everywhere.</td></tr>
+            <tr><td><strong>manager</strong></td><td>Own tenant</td><td>Create/delete clients, edit config, manage secrets.</td></tr>
+            <tr><td><strong>developer</strong></td><td>Own tenant</td><td>Add/delete client secrets only (no client CRUD).</td></tr>
+          </tbody>
+        </table>
+        <p>Every client can hold up to <strong>two secrets</strong> for zero-downtime rotation, and can be
+        restricted to specific end-user emails (e.g. <code>@yourco.com</code>).</p>
+
+        <h2 id="flow">The OAuth flow</h2>
+        <pre>App ──1 authorize URL──▸ Browser ──▸ /oauth/authorize   (user logs in + consents)
+App ◀─2 redirect ?code=… ── Browser
+App ──3 POST /oauth/token (code + client_secret + PKCE) ──▸ SSO
+App ◀─4 access_token + id_token + refresh_token (JWT) ────── SSO
+App ──5 GET /oauth/userinfo (Bearer access_token) ────────▸ SSO ──▸ { sub, email }</pre>
+        <p>Access and id tokens are self-verifying <strong>RS256 JWTs</strong> — verify them against the
+        JWKS without a round-trip. Refresh tokens rotate on every use.</p>
+
+        <h2 id="endpoints">Endpoints</h2>
+        <table>
+          <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>/.well-known/openid-configuration</code></td><td>OIDC discovery document</td></tr>
+            <tr><td><code>/.well-known/jwks.json</code></td><td>Public keys to verify tokens</td></tr>
+            <tr><td><code>/oauth/authorize</code></td><td>Authorization + login + consent</td></tr>
+            <tr><td><code>/oauth/token</code></td><td>Token endpoint (all grants)</td></tr>
+            <tr><td><code>/oauth/userinfo</code></td><td>UserInfo (Bearer access token)</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="sdks">SDKs</h2>
+        <p>Official clients live in <a href="https://github.com/dalang-io/sso/tree/main/sdks">sdks/</a> — all
+        expose the same shape: build an authorize URL (with PKCE), exchange the code, refresh, and fetch
+        UserInfo.</p>
+        <h3>JavaScript / TypeScript</h3>
+        <pre>import { DalangSSO, generatePkce } from "@dalang-io/sso";
+
+const sso = new DalangSSO({ baseUrl: "https://sso.example.com",
+  clientId: "CLIENT_ID", clientSecret: process.env.SSO_SECRET,
+  redirectUri: "https://app.example.com/callback" });
+
+// 1. redirect the user
+const pkce = await generatePkce();
+location.href = sso.authorizeUrl({ scope: "openid email", state, pkce });
+
+// 2. on your callback (server-side)
+const tokens = await sso.exchangeCode(code, pkce.verifier);
+const me = await sso.userInfo(tokens.access_token);</pre>
+        <h3>Python</h3>
+        <pre>from dalang_sso import Client, generate_pkce
+sso = Client("https://sso.example.com", "CLIENT_ID", SECRET, "https://app/callback")
+pkce = generate_pkce()
+url = sso.authorize_url("openid email", "state", pkce)
+tokens = sso.exchange_code(code, pkce)
+me = sso.userinfo(tokens.access_token)</pre>
+        <h3>Go</h3>
+        <pre>sso := dalangsso.New("https://sso.example.com", "CLIENT_ID", secret, "https://app/callback")
+pkce, _ := dalangsso.GeneratePkce()
+url := sso.AuthorizeURL("openid email", "state", pkce)
+tokens, _ := sso.ExchangeCode(code, pkce)
+me, _ := sso.UserInfo(tokens.AccessToken)</pre>
+        <p>Rust, Java and PHP follow the same API — see each SDK’s README.</p>
+
+        <h2 id="config">Configuration</h2>
+        <p>All configuration is environment variables (via <code>.env</code>). Common ones:</p>
+        <table>
+          <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>SSO_BIND_ADDR</code></td><td><code>127.0.0.1:8080</code></td><td>Listen address</td></tr>
+            <tr><td><code>SSO_PUBLIC_URL</code></td><td><code>http://localhost:8080</code></td><td>Public origin / OIDC issuer</td></tr>
+            <tr><td><code>DATABASE_URL</code></td><td><code>sqlite://data/sso.db</code></td><td>SQLite / Postgres / MySQL</td></tr>
+            <tr><td><code>SSO_TOKEN_SIGNING_ALG</code></td><td><code>rs256</code></td><td><code>rs256</code> or <code>ml-dsa-65</code> (PQC)</td></tr>
+            <tr><td><code>SSO_BRAND_TITLE</code></td><td><code>Dalang SSO</code></td><td>Dashboard title</td></tr>
+            <tr><td><code>SSO_LOGO_PATH</code> / <code>SSO_FAVICON_PATH</code></td><td>bundled</td><td>Custom local branding</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="deploy">Self-hosting</h2>
+        <p>Dalang SSO is one static binary — copy it to a server, set a <code>.env</code>, and run it under
+        systemd behind a TLS-terminating reverse proxy (or Cloudflare). Point <code>SSO_PUBLIC_URL</code> at
+        your HTTPS origin; it becomes the OIDC issuer. Scale horizontally: the app tier is stateless (JWTs
+        verify without the DB; the admin session is a signed cookie), so run N nodes behind a load balancer
+        with a shared Postgres/MySQL and the same signing key.</p>
+
+        <h2 id="pqc">Post-quantum</h2>
+        <p>Set <code>SSO_TOKEN_SIGNING_ALG=ml-dsa-65</code> to sign access/id tokens with ML-DSA (FIPS 204),
+        making them resistant to quantum attacks. The JWKS advertises the key and discovery reports the
+        algorithm. The classical <code>rs256</code> default maximizes interop with existing JWT libraries.
+        Password/secret hashing (Argon2) and token hashing (SHA-256) are already quantum-safe.</p>
+
+        <h2 id="faq">FAQ</h2>
+        <h3>Is this a drop-in Keycloak replacement?</h3>
+        <p>It covers the core IdP surface (clients, login, consent, tokens, JWKS, UserInfo, RBAC, multi-tenancy).
+        It is intentionally lean — it is not trying to match every Keycloak feature (e.g. SAML, LDAP
+        federation), but it is far smaller and faster to operate.</p>
+        <h3>Does it run without internet access?</h3>
+        <p>Yes — no CDN or external fonts; all assets are local, and SQLite is embedded.</p>
+        <h3>How do I build from source?</h3>
+        <p><code>cargo build --release -p sso-server</code> (Rust 1.90+). Cross-compile a static Linux binary
+        with <code>cargo zigbuild --release --target x86_64-unknown-linux-musl -p sso-server</code>.</p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>© Dalang · Apache-2.0 · <a href="https://github.com/dalang-io/sso">github.com/dalang-io/sso</a></span>
+      <span><a href="/">Home</a> · <a href="/llms.txt">llms.txt</a></span>
+    </div>
+  </footer>
+</body>
+</html>
