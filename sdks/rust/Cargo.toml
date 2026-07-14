@@ -1,0 +1,17 @@
+[package]
+name = "dalang-sso"
+description = "Rust client SDK for Dalang SSO (OAuth 2.0 / OIDC)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+url = "2"
+thiserror = "2"

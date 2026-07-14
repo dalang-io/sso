@@ -1,0 +1,25 @@
+[Unit]
+Description=Dalang SSO — self-hosted OAuth 2.0 / OIDC provider
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/dalang-sso
+EnvironmentFile=/opt/dalang-sso/.env
+ExecStart=/opt/dalang-sso/sso
+Restart=on-failure
+RestartSec=2
+# Bind to all interfaces so the reverse proxy can reach it; keep it firewalled
+# so only the proxy (localhost) talks to it in real deployments.
+Environment=SSO_BIND_ADDR=127.0.0.1:8080
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dalang-sso/data
+PrivateTmp=true
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

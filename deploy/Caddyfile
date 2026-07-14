@@ -1,0 +1,12 @@
+# Reverse proxy with automatic HTTPS in front of Dalang SSO.
+# Caddy handles TLS certs (Let's Encrypt) and, in recent builds, offers a
+# post-quantum hybrid key exchange (X25519MLKEM768) out of the box — see docs/PQC.md.
+#
+#   caddy run --config deploy/Caddyfile
+#
+# Replace sso.example.com with your real SSO hostname (this is the SSO_PUBLIC_URL).
+
+sso.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}

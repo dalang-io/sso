@@ -1,0 +1,48 @@
+# --- Secrets & local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Claude Code / AI tooling (keep private) ---
+.claude/
+CLAUDE.local.md
+
+# --- Rust ---
+/target
+**/target
+Cargo.lock.bak
+*.rs.bk
+
+# --- Databases (default sqlite lives locally) ---
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+
+# --- Node / SDK builds ---
+node_modules/
+sdks/js/dist/
+sdks/js/*.tsbuildinfo
+
+# --- Python SDK ---
+__pycache__/
+*.pyc
+sdks/python/build/
+sdks/python/dist/
+sdks/python/*.egg-info/
+
+# --- Go / Java / PHP SDK builds ---
+sdks/go/bin/
+sdks/java/target/
+sdks/php/vendor/
+
+# --- Editor / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp

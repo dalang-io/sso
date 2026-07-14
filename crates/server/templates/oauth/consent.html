@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Authorize {{ client_name }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-sm">
+  <h1 class="mb-1 text-xl font-semibold text-slate-900">Authorize access</h1>
+  <p class="mb-6 text-sm text-slate-600">
+    <strong>{{ client_name }}</strong> wants to sign you in and access:
+    <span class="font-mono">{{ scope }}</span>
+  </p>
+
+  <!-- Demo consent screen. In a full deployment this appears after end-user
+       authentication; here it hands back an authorization code for `subject`. -->
+  <form method="post" action="/oauth/authorize" class="space-y-3 rounded-lg border border-slate-200 bg-white p-6">
+    {% for k, v in params %}<input type="hidden" name="{{ k }}" value="{{ v }}" />{% endfor %}
+    <div>
+      <label class="block text-sm font-medium text-slate-700">Sign in as (subject)</label>
+      <input name="subject" value="user@example.com" required
+             class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none" />
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button name="decision" value="allow"
+              class="flex-1 rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">Allow</button>
+      <button name="decision" value="deny"
+              class="flex-1 rounded border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50">Deny</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

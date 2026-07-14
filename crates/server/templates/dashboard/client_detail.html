@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — Dalang SSO{% endblock %}
+{% block content %}
+<a href="/dashboard" class="text-sm text-indigo-600 hover:underline">&larr; All clients</a>
+<h1 class="mb-6 mt-2 text-xl font-semibold text-slate-900">{{ client.name }}</h1>
+
+<div class="mb-6 grid gap-4 sm:grid-cols-2">
+  <div class="rounded-lg border border-slate-200 bg-white p-4">
+    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Client ID</div>
+    <div class="mt-1 break-all font-mono text-sm">{{ client.client_id }}</div>
+  </div>
+  <div class="rounded-lg border border-slate-200 bg-white p-4">
+    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Client secret</div>
+    <div class="mt-1 text-sm text-slate-500">Stored hashed — shown only once at creation.</div>
+  </div>
+</div>
+
+<!-- Both lists post to the same endpoint; htmx swaps the returned partial in place. -->
+<form method="post" action="/dashboard/clients/{{ client.id }}/uris"
+      class="space-y-6 rounded-lg border border-slate-200 bg-white p-6">
+  <div>
+    <label class="block text-sm font-semibold text-slate-700">Authorized JavaScript origins</label>
+    <p class="mb-2 text-xs text-slate-500">One per line. Used for browser-based (PKCE) requests. e.g. https://app.example.com</p>
+    <textarea name="js_origins" rows="4"
+      class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none">{{ js_origins_text }}</textarea>
+  </div>
+  <div>
+    <label class="block text-sm font-semibold text-slate-700">Authorized redirect URIs</label>
+    <p class="mb-2 text-xs text-slate-500">One per line. Exact match required. e.g. https://app.example.com/auth/callback</p>
+    <textarea name="redirect_uris" rows="4"
+      class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none">{{ redirect_uris_text }}</textarea>
+  </div>
+  <div class="flex items-center justify-between">
+    <button class="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">Save</button>
+    <button formaction="/dashboard/clients/{{ client.id }}/delete"
+            class="text-sm text-red-600 hover:underline">Delete client</button>
+  </div>
+</form>
+{% endblock %}

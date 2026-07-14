@@ -1,0 +1,16 @@
+{
+    "name": "dalang/sso",
+    "description": "Client SDK for Dalang SSO (OAuth 2.0 / OpenID Connect).",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dalang\\Sso\\": "src/"
+        }
+    }
+}

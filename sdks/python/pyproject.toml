@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dalang-sso"
+version = "0.1.0"
+description = "Client SDK for Dalang SSO (OAuth 2.0 / OpenID Connect)."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["requests>=2.25"]
+
+[tool.setuptools.packages.find]
+include = ["dalang_sso*"]
