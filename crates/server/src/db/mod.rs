@@ -78,6 +78,13 @@ impl Db {
             }
             sqlx::query(stmt).execute(&self.pool).await?;
         }
+
+        // Best-effort additive migrations for columns added after the initial
+        // schema. On a fresh DB the column already exists and the ALTER errors
+        // (duplicate column) — which is expected and ignored.
+        for alter in ["ALTER TABLE clients ADD COLUMN allowed_emails TEXT NOT NULL DEFAULT '[]'"] {
+            let _ = sqlx::query(alter).execute(&self.pool).await;
+        }
         Ok(())
     }
 
@@ -215,8 +222,8 @@ impl Db {
 
     pub async fn create_client(&self, client: &Client) -> anyhow::Result<()> {
         let sql = self.q("INSERT INTO clients \
-             (id, client_id, client_secret_hash, name, js_origins, redirect_uris, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?)");
+             (id, client_id, client_secret_hash, name, js_origins, redirect_uris, allowed_emails, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -224,22 +231,27 @@ impl Db {
             .bind(&client.name)
             .bind(serde_json::to_string(&client.js_origins)?)
             .bind(serde_json::to_string(&client.redirect_uris)?)
+            .bind(serde_json::to_string(&client.allowed_emails)?)
             .bind(&client.created_at)
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
-    pub async fn update_client_uris(
+    pub async fn update_client_config(
         &self,
         id: &str,
         js_origins: &[String],
         redirect_uris: &[String],
+        allowed_emails: &[String],
     ) -> anyhow::Result<()> {
-        let sql = self.q("UPDATE clients SET js_origins = ?, redirect_uris = ? WHERE id = ?");
+        let sql = self.q(
+            "UPDATE clients SET js_origins = ?, redirect_uris = ?, allowed_emails = ? WHERE id = ?",
+        );
         sqlx::query(&sql)
             .bind(serde_json::to_string(js_origins)?)
             .bind(serde_json::to_string(redirect_uris)?)
+            .bind(serde_json::to_string(allowed_emails)?)
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -341,6 +353,8 @@ impl Db {
 fn row_to_client(r: &AnyRow) -> Client {
     let js: String = r.get("js_origins");
     let uris: String = r.get("redirect_uris");
+    // `try_get` so a pre-migration row without the column reads as allow-all.
+    let emails: String = r.try_get("allowed_emails").unwrap_or_else(|_| "[]".into());
     Client {
         id: r.get("id"),
         client_id: r.get("client_id"),
@@ -348,6 +362,7 @@ fn row_to_client(r: &AnyRow) -> Client {
         name: r.get("name"),
         js_origins: serde_json::from_str(&js).unwrap_or_default(),
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
+        allowed_emails: serde_json::from_str(&emails).unwrap_or_default(),
         created_at: r.get("created_at"),
     }
 }

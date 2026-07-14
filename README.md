@@ -12,6 +12,8 @@ Google.
   PostgreSQL / MySQL / MariaDB with one `DATABASE_URL`. (Oracle/MSSQL: roadmap.)
 - 🖥️ **htmx + Tailwind dashboard** — manage clients, secrets, origins, redirect
   URIs. Server-rendered, no SPA build.
+- 📧 **Per-client email allow-lists** — restrict a client to `@yourco.com`,
+  `*@example.com`, or a specific address; empty = allow all (with a warning).
 - 🔐 **Post-quantum ready** — optional ML-DSA (FIPS 204) token signing; hybrid
   ML-KEM at the TLS proxy. See [`docs/PQC.md`](docs/PQC.md).
 - 📦 **SDKs** — JS/TS, Rust, Go, Python, Java, PHP in [`sdks/`](sdks/).

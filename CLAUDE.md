@@ -124,3 +124,15 @@ secrets or the JWT private key. `.env.example` is the committed template.
 (`client_created.html`) and only its Argon2 hash is stored. There is no endpoint
 that reveals it again — regenerate if lost. Redirect URIs are matched exactly;
 JS origins are the CORS allow-list for browser/PKCE flows.
+
+## Per-client email allow-list
+
+Each client has `allowed_emails` (JSON TEXT column, same storage pattern as
+`js_origins`). `Client::email_allowed` / `models::email_allowed` decide access:
+patterns are `@domain` / `*@domain` (whole domain) or `user@domain` (one exact
+address), case-insensitive; an **empty list allows everyone** (the dashboard
+shows an abuse warning in that state). Enforced at three points — login,
+register (rejects *before* creating the account), and, as the authoritative
+hard gate, `authorize::decide` right before the code is minted (so a stale
+session or bypassed UI still can't get a code). When adding new flow entry
+points, re-check `email_allowed` — do not rely on the UI having filtered.

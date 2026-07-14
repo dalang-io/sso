@@ -40,7 +40,36 @@ pub struct Client {
     pub js_origins: Vec<String>,
     /// Exact-match allow-list the `redirect_uri` parameter is validated against.
     pub redirect_uris: Vec<String>,
+    /// Which end-user emails may sign in to this client. Patterns:
+    /// `@domain` / `*@domain` (any address at that domain) or `user@domain`
+    /// (one exact address). **Empty means allow all** (see the dashboard warning).
+    pub allowed_emails: Vec<String>,
     pub created_at: String,
+}
+
+impl Client {
+    /// Whether `email` is permitted to authenticate to this client.
+    /// An empty allow-list permits everyone (open registration).
+    pub fn email_allowed(&self, email: &str) -> bool {
+        email_allowed(email, &self.allowed_emails)
+    }
+}
+
+/// Match an email against a list of patterns (`@domain`, `*@domain`, or an exact
+/// `user@domain`). An empty list allows everyone. Case-insensitive.
+pub fn email_allowed(email: &str, patterns: &[String]) -> bool {
+    if patterns.is_empty() {
+        return true;
+    }
+    let e = email.trim().to_lowercase();
+    let domain = e.rsplit_once('@').map(|(_, d)| d).unwrap_or("");
+    patterns.iter().any(|p| {
+        let p = p.trim().to_lowercase();
+        match p.strip_prefix("*@").or_else(|| p.strip_prefix('@')) {
+            Some(d) => !d.is_empty() && domain == d, // domain pattern
+            None => e == p,                          // exact address
+        }
+    })
 }
 
 /// A short-lived authorization code (RFC 6749 §4.1), exchanged at `/oauth/token`.
@@ -65,6 +94,44 @@ pub struct RefreshToken {
     pub subject: String,
     pub scope: String,
     pub expires_at: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::email_allowed;
+
+    fn pats(s: &[&str]) -> Vec<String> {
+        s.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn empty_list_allows_everyone() {
+        assert!(email_allowed("anyone@anywhere.com", &[]));
+    }
+
+    #[test]
+    fn domain_patterns_match_domain_only() {
+        let p = pats(&["@dalang.io", "*@intern.dalang.io"]);
+        assert!(email_allowed("han@dalang.io", &p));
+        assert!(email_allowed("BOB@Intern.Dalang.IO", &p)); // case-insensitive
+        assert!(!email_allowed("han@evil.io", &p));
+        assert!(!email_allowed("han@sub.dalang.io", &p)); // not a subdomain match
+    }
+
+    #[test]
+    fn exact_address_matches_only_itself() {
+        let p = pats(&["user@example.com"]);
+        assert!(email_allowed("user@example.com", &p));
+        assert!(!email_allowed("other@example.com", &p));
+    }
+
+    #[test]
+    fn mixed_list() {
+        let p = pats(&["@dalang.io", "vip@example.com"]);
+        assert!(email_allowed("x@dalang.io", &p));
+        assert!(email_allowed("vip@example.com", &p));
+        assert!(!email_allowed("nope@example.com", &p));
+    }
 }
 
 /// Standard OIDC token endpoint response body.

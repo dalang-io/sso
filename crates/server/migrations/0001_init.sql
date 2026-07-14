@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS clients (
     name               VARCHAR(255) NOT NULL,
     js_origins         TEXT         NOT NULL,
     redirect_uris      TEXT         NOT NULL,
+    -- JSON array of allowed email patterns; empty ([]) means allow all.
+    allowed_emails     TEXT         NOT NULL DEFAULT '[]',
     created_at         VARCHAR(40)  NOT NULL
 );
 

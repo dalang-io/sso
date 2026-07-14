@@ -43,6 +43,7 @@ pub async fn create(
         name: form.name.trim().to_string(),
         js_origins: vec![],
         redirect_uris: vec![],
+        allowed_emails: vec![],
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
@@ -77,6 +78,8 @@ pub async fn detail(
             client => client,
             js_origins_text => client.js_origins.join("\n"),
             redirect_uris_text => client.redirect_uris.join("\n"),
+            allowed_emails_text => client.allowed_emails.join("\n"),
+            no_email_filter => client.allowed_emails.is_empty(),
         },
     )?;
     Ok(Html(body))
@@ -86,6 +89,7 @@ pub async fn detail(
 pub struct UrisForm {
     js_origins: String,
     redirect_uris: String,
+    allowed_emails: String,
 }
 
 pub async fn update_uris(
@@ -102,7 +106,11 @@ pub async fn update_uris(
         .ok_or(AppError::NotFound)?;
     let js = parse_lines(&form.js_origins);
     let uris = parse_lines(&form.redirect_uris);
-    state.db.update_client_uris(&id, &js, &uris).await?;
+    let emails = parse_lines(&form.allowed_emails);
+    state
+        .db
+        .update_client_config(&id, &js, &uris, &emails)
+        .await?;
     Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
 }
 

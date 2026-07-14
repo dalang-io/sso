@@ -122,6 +122,14 @@ pub(super) fn render_consent(
     Ok(Html(body))
 }
 
+/// Message shown when a signed-in account is not on a client's email allow-list.
+pub(super) fn email_denied_msg(email: &str, client: &Client) -> String {
+    format!(
+        "{email} is not permitted to access {}. Sign in with an authorized account.",
+        client.name
+    )
+}
+
 /// GET /oauth/authorize — login screen if signed out, consent screen if in.
 pub async fn show(
     State(state): State<AppState>,
@@ -130,6 +138,13 @@ pub async fn show(
 ) -> AppResult<Html<String>> {
     let client = validate(&state, &p).await?;
     match current_user(&state, &jar).await {
+        // Signed in but not on this client's allow-list: offer another account.
+        Some(user) if !client.email_allowed(&user.email) => render_login(
+            &state,
+            &client,
+            &p,
+            Some(&email_denied_msg(&user.email, &client)),
+        ),
         Some(user) => render_consent(&state, &client, &p, &user.email),
         None => render_login(&state, &client, &p, None),
     }
@@ -155,6 +170,14 @@ pub async fn decide(
     let user = current_user(&state, &jar)
         .await
         .ok_or_else(|| AppError::oauth("access_denied", "not signed in"))?;
+
+    // Hard gate: enforce the client's email allow-list even if the UI was bypassed.
+    if !client.email_allowed(&user.email) {
+        return Err(AppError::oauth(
+            "access_denied",
+            "this account is not permitted to access this client",
+        ));
+    }
 
     if f.decision != "allow" {
         return Ok(Redirect::to(&append_query(

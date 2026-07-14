@@ -54,6 +54,11 @@ pub async fn login(
     let user = state.db.user_by_email(f.email.trim()).await?;
     match user {
         Some(u) if crate::crypto::verify_secret(&f.password, &u.password_hash) => {
+            // Authenticated — now check this client's email allow-list.
+            if !client.email_allowed(&u.email) {
+                let msg = super::authorize::email_denied_msg(&u.email, &client);
+                return Ok(render_login(&state, &client, &f.params, Some(&msg))?.into_response());
+            }
             let jar = jar.add(session_cookie(u.id));
             Ok((jar, render_consent(&state, &client, &f.params, &u.email)?).into_response())
         }
@@ -76,17 +81,20 @@ pub async fn register(
     let client = validate(&state, &f.params).await?;
     let email = f.email.trim();
 
-    let err = if !email.contains('@') {
-        Some("Enter a valid email address")
+    let err: Option<String> = if !email.contains('@') {
+        Some("Enter a valid email address".into())
     } else if f.password.len() < MIN_PASSWORD_LEN {
-        Some("Password must be at least 8 characters")
+        Some("Password must be at least 8 characters".into())
+    } else if !client.email_allowed(email) {
+        // Don't create accounts that can't use the client they're registering for.
+        Some(super::authorize::email_denied_msg(email, &client))
     } else if state.db.user_by_email(email).await?.is_some() {
-        Some("An account with that email already exists")
+        Some("An account with that email already exists".into())
     } else {
         None
     };
     if let Some(msg) = err {
-        return Ok(render_login(&state, &client, &f.params, Some(msg))?.into_response());
+        return Ok(render_login(&state, &client, &f.params, Some(&msg))?.into_response());
     }
 
     let user = state.db.create_user(email, &f.password).await?;

@@ -30,6 +30,23 @@
     <textarea name="redirect_uris" rows="4"
       class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none">{{ redirect_uris_text }}</textarea>
   </div>
+  <div>
+    <label class="block text-sm font-semibold text-slate-700">Allowed email addresses</label>
+    <p class="mb-2 text-xs text-slate-500">
+      One per line. Only matching end users may sign in to this client. Formats:
+      <code>@dalang.io</code> or <code>*@example.com</code> (whole domain), or
+      <code>user@example.com</code> (one address). Leave empty to allow everyone.
+    </p>
+    {% if no_email_filter %}
+    <div class="mb-2 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <span>⚠️</span>
+      <span><strong>No email filter set — anyone who can register can sign in to this client.</strong>
+        This is open to abuse. Add a domain (e.g. <code>@yourcompany.com</code>) to restrict access.</span>
+    </div>
+    {% endif %}
+    <textarea name="allowed_emails" rows="4" placeholder="@dalang.io&#10;*@intern.dalang.io&#10;someone@example.com"
+      class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none">{{ allowed_emails_text }}</textarea>
+  </div>
   <div class="flex items-center justify-between">
     <button class="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">Save</button>
     <button formaction="/dashboard/clients/{{ client.id }}/delete"
