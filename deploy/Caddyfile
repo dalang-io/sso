@@ -4,9 +4,9 @@
 #
 #   caddy run --config deploy/Caddyfile
 #
-# Replace sso.example.com with your real SSO hostname (this is the SSO_PUBLIC_URL).
+# sso.dalang.io must resolve to this host (A + AAAA already configured).
 
-sso.example.com {
+sso.dalang.io {
 	encode gzip
 	reverse_proxy 127.0.0.1:8080
 }

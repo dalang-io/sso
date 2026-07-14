@@ -9,9 +9,9 @@ EnvironmentFile=/opt/dalang-sso/.env
 ExecStart=/opt/dalang-sso/sso
 Restart=on-failure
 RestartSec=2
-# Bind to all interfaces so the reverse proxy can reach it; keep it firewalled
-# so only the proxy (localhost) talks to it in real deployments.
-Environment=SSO_BIND_ADDR=127.0.0.1:8080
+# Bind address comes from .env (SSO_BIND_ADDR). Behind Cloudflare "Flexible"
+# SSL the app serves plain HTTP directly on 0.0.0.0:80; behind a local TLS
+# proxy set it to 127.0.0.1:8080 instead.
 
 # Hardening
 NoNewPrivileges=true
