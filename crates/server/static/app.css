@@ -43,6 +43,11 @@ body {
   font-family: var(--font);
   color: var(--ink);
   background: var(--paper);
+  /* Brutalist grid texture — kept faint so the darkened text stays legible. */
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -181,7 +186,8 @@ p { margin: 0 0 0.75rem; }
 @media (min-width: 640px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 980px) { .feature-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .feature { background: var(--white); border: 2px solid var(--black); box-shadow: var(--shadow); padding: 1.25rem; }
-.feature .ico { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 2px solid var(--black); background: var(--primary); font-size: 1.15rem; margin-bottom: 0.75rem; }
+.feature .ico { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border: 2px solid var(--black); background: var(--primary); color: var(--black); margin-bottom: 0.85rem; }
+.feature .ico svg { width: 22px; height: 22px; display: block; }
 .feature h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 0.4rem; }
 .feature p { font-size: 0.95rem; line-height: 1.6; color: #334155; margin: 0; }
 
