@@ -2,12 +2,25 @@
 -- Types kept to the common subset; values are generated in Rust, so no
 -- dialect-specific defaults or functions appear here.
 
+-- A tenant is an isolated workspace that owns OAuth clients. Managers and
+-- developers belong to exactly one tenant; super admins are global.
+CREATE TABLE IF NOT EXISTS tenants (
+    id         VARCHAR(36)  PRIMARY KEY,
+    name       VARCHAR(255) NOT NULL,
+    created_at VARCHAR(40)  NOT NULL
+);
+
+-- Dashboard users (members). role ∈ super | manager | developer.
+--   super     -> global; manages tenants, users, and everything
+--   manager   -> own tenant; CRUD clients + secrets
+--   developer -> own tenant; secrets only (no client create/delete/config)
+-- tenant_id is NULL for super admins.
 CREATE TABLE IF NOT EXISTS admins (
     id            VARCHAR(36)  PRIMARY KEY,
     email         VARCHAR(320) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    -- 'super' for the first admin created during onboarding, else 'admin'.
-    role          VARCHAR(16)  NOT NULL DEFAULT 'admin'
+    role          VARCHAR(16)  NOT NULL DEFAULT 'manager',
+    tenant_id     VARCHAR(36)
 );
 
 -- End users: the people who sign in to relying apps through this SSO
@@ -23,6 +36,7 @@ CREATE TABLE IF NOT EXISTS clients (
     id                 VARCHAR(36)  PRIMARY KEY,
     client_id          VARCHAR(64)  NOT NULL UNIQUE,
     client_secret_hash VARCHAR(255) NOT NULL,
+    tenant_id          VARCHAR(36),
     name               VARCHAR(255) NOT NULL,
     js_origins         TEXT         NOT NULL,
     redirect_uris      TEXT         NOT NULL,

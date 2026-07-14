@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Members · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Members</h1>
+<p class="muted small mb-lg">
+  Dashboard users. <strong>Managers</strong> manage clients in their tenant;
+  <strong>developers</strong> can only rotate secrets. Super admins are global.
+</p>
+
+<div class="panel mb-lg">
+  <h2>Add member</h2>
+  <form method="post" action="/dashboard/members" class="stack">
+    <div class="grid-2">
+      <div class="field" style="margin:0">
+        <label class="label">Email</label>
+        <input class="input" name="email" type="email" required placeholder="dev@acme.com" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label">Password</label>
+        <input class="input" name="password" type="password" required placeholder="At least 8 characters" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label">Role</label>
+        <select class="input" name="role" required>
+          {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label">Tenant</label>
+        <select class="input" name="tenant_id" required>
+          <option value="">Select…</option>
+          {% for t in tenants %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div><button class="btn btn-primary">Add member</button></div>
+  </form>
+</div>
+
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Email</th><th>Role</th><th>Tenant</th><th></th></tr></thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td>{{ m.email }}{% if m.id == self_id %} <span class="muted tiny">(you)</span>{% endif %}</td>
+        <td>
+          {% if m.role == "super" %}<span class="badge badge-super">super</span>
+          {% elif m.role == "manager" %}<span class="badge badge-primary">manager</span>
+          {% else %}<span class="badge badge-neutral">developer</span>{% endif %}
+        </td>
+        <td class="small">{{ tenant_names[m.tenant_id] if m.tenant_id else "— global —" }}</td>
+        <td style="text-align:right">
+          {% if m.id != self_id and m.role != "super" %}
+          <form method="post" action="/dashboard/members/{{ m.id }}/delete"
+                onsubmit="return confirm('Remove {{ m.email }}?');">
+            <button class="link-danger">Remove</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -6,21 +6,62 @@
 use serde::Serialize;
 
 /// An admin user of the dashboard (not an end-user of a downstream app).
+/// An isolated workspace that owns OAuth clients.
+#[derive(Clone, Debug, Serialize)]
+pub struct Tenant {
+    pub id: String,
+    pub name: String,
+    pub created_at: String,
+}
+
+/// A dashboard user (member). Roles and what they may do:
+/// - `super`     — global; manages tenants, members, and every client/secret.
+/// - `manager`   — own tenant; create/delete clients, edit config, manage secrets.
+/// - `developer` — own tenant; add/delete secrets only (no client CRUD/config).
 #[derive(Clone, Debug, Serialize)]
 pub struct Admin {
     pub id: String,
     pub email: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
-    /// `super` for the onboarding-created first admin, otherwise `admin`.
     pub role: String,
+    /// The tenant this member belongs to; `None` for super admins (global).
+    pub tenant_id: Option<String>,
 }
 
 impl Admin {
     pub fn is_super(&self) -> bool {
         self.role == "super"
     }
+    pub fn is_manager(&self) -> bool {
+        self.role == "manager"
+    }
+    pub fn is_developer(&self) -> bool {
+        self.role == "developer"
+    }
+
+    /// Super and managers may create/delete clients and edit their config.
+    pub fn can_manage_clients(&self) -> bool {
+        self.is_super() || self.is_manager()
+    }
+    /// All three roles may add/delete secrets (developers included).
+    pub fn can_manage_secrets(&self) -> bool {
+        self.is_super() || self.is_manager() || self.is_developer()
+    }
+    /// Only super admins manage tenants and members.
+    pub fn can_manage_members(&self) -> bool {
+        self.is_super()
+    }
+
+    /// Whether this member may act on a client owned by `tenant_id`.
+    /// Super admins can act on any tenant; others only on their own.
+    pub fn can_access_tenant(&self, tenant_id: Option<&str>) -> bool {
+        self.is_super() || (self.tenant_id.is_some() && self.tenant_id.as_deref() == tenant_id)
+    }
 }
+
+/// Valid dashboard roles (super is assigned only via onboarding).
+pub const ASSIGNABLE_ROLES: [&str; 2] = ["manager", "developer"];
 
 /// An end user who authenticates to relying apps via this SSO. Distinct from
 /// [`Admin`], who only manages the dashboard.
@@ -40,6 +81,8 @@ pub struct Client {
     pub id: String,
     /// Public identifier handed to relying apps (`client_id`).
     pub client_id: String,
+    /// The tenant that owns this client.
+    pub tenant_id: Option<String>,
     pub name: String,
     /// CORS allow-list for browser (implicit/PKCE) flows.
     pub js_origins: Vec<String>,

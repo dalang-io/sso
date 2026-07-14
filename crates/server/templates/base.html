@@ -18,7 +18,16 @@
       </a>
       {% if admin_email %}
       <div class="header-meta">
-        {% if admin_role == "super" %}<span class="badge badge-super">super admin</span>{% endif %}
+        <nav class="header-nav">
+          <a href="/dashboard">Clients</a>
+          {% if admin_role == "super" %}
+          <a href="/dashboard/tenants">Tenants</a>
+          <a href="/dashboard/members">Members</a>
+          {% endif %}
+        </nav>
+        {% if admin_role == "super" %}<span class="badge badge-super">super admin</span>
+        {% elif admin_role == "manager" %}<span class="badge badge-primary">manager</span>
+        {% elif admin_role == "developer" %}<span class="badge badge-neutral">developer</span>{% endif %}
         <span class="muted small">{{ admin_email }}</span>
         <form method="post" action="/logout"><button class="btn btn-sm btn-secondary">Sign out</button></form>
       </div>

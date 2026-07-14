@@ -45,8 +45,16 @@
   {% endif %}
 </div>
 
+{% if not can_manage %}
+<div class="panel-muted"><p class="muted small" style="margin:0">
+  You have <strong>developer</strong> access: you can rotate secrets above, but
+  editing origins/redirect URIs and deleting the client require a manager.
+</p></div>
+{% endif %}
+
+{% if can_manage %}
 <!-- The origins/redirect/email config is a separate form (rotating a secret
-     must not touch these lists). -->
+     must not touch these lists). Managers + super only. -->
 <form method="post" action="/dashboard/clients/{{ client.id }}/uris" class="panel">
   <div class="field">
     <label class="label">Authorized JavaScript origins</label>
@@ -80,4 +88,5 @@
             onsubmit="return confirm('Delete this client?');">Delete client</button>
   </div>
 </form>
+{% endif %}
 {% endblock %}

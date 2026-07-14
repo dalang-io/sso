@@ -12,7 +12,7 @@
 //! they plug in behind the same method surface — see `docs/DATABASE.md`.
 
 use crate::crypto;
-use crate::models::{Admin, AuthCode, Client, ClientSecret, RefreshToken, User};
+use crate::models::{Admin, AuthCode, Client, ClientSecret, RefreshToken, Tenant, User};
 use sqlx::any::{AnyPoolOptions, AnyRow};
 use sqlx::{AnyPool, Row};
 
@@ -84,7 +84,9 @@ impl Db {
         // (duplicate column) — which is expected and ignored.
         for alter in [
             "ALTER TABLE clients ADD COLUMN allowed_emails TEXT NOT NULL DEFAULT '[]'",
-            "ALTER TABLE admins ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'admin'",
+            "ALTER TABLE admins ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'manager'",
+            "ALTER TABLE admins ADD COLUMN tenant_id VARCHAR(36)",
+            "ALTER TABLE clients ADD COLUMN tenant_id VARCHAR(36)",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -119,28 +121,102 @@ impl Db {
         Ok(row.try_get::<i64, _>("c")?)
     }
 
-    /// Create an admin with the given role (`super` or `admin`).
+    /// Create an admin with the given role and tenant (`tenant_id` None for super).
     pub async fn create_admin(
         &self,
         email: &str,
         password: &str,
         role: &str,
+        tenant_id: Option<&str>,
     ) -> anyhow::Result<Admin> {
         let admin = Admin {
             id: uuid::Uuid::new_v4().to_string(),
             email: email.to_string(),
             password_hash: crypto::hash_secret(password)?,
             role: role.to_string(),
+            tenant_id: tenant_id.map(|s| s.to_string()),
         };
-        let sql = self.q("INSERT INTO admins (id, email, password_hash, role) VALUES (?, ?, ?, ?)");
+        let sql = self.q(
+            "INSERT INTO admins (id, email, password_hash, role, tenant_id) VALUES (?, ?, ?, ?, ?)",
+        );
         sqlx::query(&sql)
             .bind(&admin.id)
             .bind(&admin.email)
             .bind(&admin.password_hash)
             .bind(&admin.role)
+            .bind(&admin.tenant_id)
             .execute(&self.pool)
             .await?;
         Ok(admin)
+    }
+
+    /// List all members (super-admin view), newest tenants' first by email.
+    pub async fn list_admins(&self) -> anyhow::Result<Vec<Admin>> {
+        let rows = sqlx::query("SELECT * FROM admins ORDER BY email ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_admin).collect())
+    }
+
+    pub async fn delete_admin(&self, id: &str) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM admins WHERE id = ?");
+        sqlx::query(&sql).bind(id).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    // ---- tenants -----------------------------------------------------------
+
+    pub async fn count_tenants(&self) -> anyhow::Result<i64> {
+        let row = sqlx::query("SELECT COUNT(*) AS c FROM tenants")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.try_get::<i64, _>("c")?)
+    }
+
+    pub async fn list_tenants(&self) -> anyhow::Result<Vec<Tenant>> {
+        let rows = sqlx::query("SELECT * FROM tenants ORDER BY created_at ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_tenant).collect())
+    }
+
+    pub async fn tenant_by_id(&self, id: &str) -> anyhow::Result<Option<Tenant>> {
+        let sql = self.q("SELECT * FROM tenants WHERE id = ?");
+        let row = sqlx::query(&sql)
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| row_to_tenant(&r)))
+    }
+
+    pub async fn create_tenant(&self, name: &str) -> anyhow::Result<Tenant> {
+        let tenant = Tenant {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let sql = self.q("INSERT INTO tenants (id, name, created_at) VALUES (?, ?, ?)");
+        sqlx::query(&sql)
+            .bind(&tenant.id)
+            .bind(&tenant.name)
+            .bind(&tenant.created_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(tenant)
+    }
+
+    pub async fn delete_tenant(&self, id: &str) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM tenants WHERE id = ?");
+        sqlx::query(&sql).bind(id).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// Return an existing tenant id, creating a "Default" tenant if none exist.
+    pub async fn ensure_default_tenant(&self) -> anyhow::Result<String> {
+        if let Some(t) = self.list_tenants().await?.into_iter().next() {
+            return Ok(t.id);
+        }
+        Ok(self.create_tenant("Default").await?.id)
     }
 
     pub async fn admin_by_email(&self, email: &str) -> anyhow::Result<Option<Admin>> {
@@ -232,12 +308,13 @@ impl Db {
         // `client_secret_hash` is a legacy NOT NULL column kept for schema
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
-             (id, client_id, client_secret_hash, name, js_origins, redirect_uris, allowed_emails, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+             (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
             .bind("")
+            .bind(&client.tenant_id)
             .bind(&client.name)
             .bind(serde_json::to_string(&client.js_origins)?)
             .bind(serde_json::to_string(&client.redirect_uris)?)
@@ -246,6 +323,16 @@ impl Db {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Clients owned by a single tenant (manager/developer view).
+    pub async fn list_clients_for_tenant(&self, tenant_id: &str) -> anyhow::Result<Vec<Client>> {
+        let sql = self.q("SELECT * FROM clients WHERE tenant_id = ? ORDER BY created_at DESC");
+        let rows = sqlx::query(&sql)
+            .bind(tenant_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_client).collect())
     }
 
     // ---- client secrets ----------------------------------------------------
@@ -439,6 +526,7 @@ fn row_to_client(r: &AnyRow) -> Client {
     Client {
         id: r.get("id"),
         client_id: r.get("client_id"),
+        tenant_id: r.try_get("tenant_id").ok(),
         name: r.get("name"),
         js_origins: serde_json::from_str(&js).unwrap_or_default(),
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
@@ -462,8 +550,17 @@ fn row_to_admin(r: &AnyRow) -> Admin {
         id: r.get("id"),
         email: r.get("email"),
         password_hash: r.get("password_hash"),
-        // Tolerant of pre-migration rows lacking the column.
-        role: r.try_get("role").unwrap_or_else(|_| "admin".into()),
+        // Tolerant of pre-migration rows lacking the columns.
+        role: r.try_get("role").unwrap_or_else(|_| "manager".into()),
+        tenant_id: r.try_get("tenant_id").ok(),
+    }
+}
+
+fn row_to_tenant(r: &AnyRow) -> Tenant {
+    Tenant {
+        id: r.get("id"),
+        name: r.get("name"),
+        created_at: r.get("created_at"),
     }
 }
 

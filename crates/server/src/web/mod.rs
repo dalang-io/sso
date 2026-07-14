@@ -3,6 +3,7 @@
 //! admin's id — no server-side session store, which keeps horizontal scaling
 //! trivial (any node can serve any request).
 
+pub mod admin;
 pub mod clients;
 
 use crate::error::{AppError, AppResult};
@@ -33,6 +34,17 @@ pub fn router() -> Router<AppState> {
             post(clients::delete_secret),
         )
         .route("/dashboard/clients/:id/delete", post(clients::delete))
+        // super-admin: tenants + members
+        .route(
+            "/dashboard/tenants",
+            get(admin::tenants_page).post(admin::create_tenant),
+        )
+        .route("/dashboard/tenants/:id/delete", post(admin::delete_tenant))
+        .route(
+            "/dashboard/members",
+            get(admin::members_page).post(admin::create_member),
+        )
+        .route("/dashboard/members/:id/delete", post(admin::delete_member))
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.
@@ -100,10 +112,13 @@ async fn setup(
         return Ok(Html(state.render("setup.html", context! { error => msg })?).into_response());
     }
 
+    // Super admin is global (no tenant). Seed a default tenant so clients have
+    // somewhere to live out of the box.
     let admin = state
         .db
-        .create_admin(email, &form.password, "super")
+        .create_admin(email, &form.password, "super", None)
         .await?;
+    state.db.ensure_default_tenant().await?;
     tracing::info!(email = %admin.email, "super admin created via onboarding");
     Ok((
         jar.add(admin_session_cookie(admin.id)),

@@ -3,25 +3,40 @@
 {% block content %}
 <h1>OAuth 2.0 Client IDs</h1>
 
+{% if can_create %}
 <div class="panel mb-lg">
   <h2>Create client</h2>
   <form method="post" action="/dashboard/clients" class="row wrap">
-    <input class="input" style="flex:1;min-width:14rem" name="name" required placeholder="My web app" />
+    <input class="input" style="flex:1;min-width:12rem" name="name" required placeholder="My web app" />
+    {% if is_super %}
+    <select class="input" name="tenant_id" required style="max-width:14rem">
+      <option value="">Tenant…</option>
+      {% for t in tenants %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+    </select>
+    {% endif %}
     <button class="btn btn-primary">Create</button>
   </form>
 </div>
+{% endif %}
 
 {% if clients %}
 <div class="table-scroll">
   <table class="table">
     <thead>
-      <tr><th>Name</th><th>Client ID</th><th>Redirect URIs</th><th>Created</th></tr>
+      <tr>
+        <th>Name</th>
+        <th>Client ID</th>
+        {% if is_super %}<th>Tenant</th>{% endif %}
+        <th>Redirect URIs</th>
+        <th>Created</th>
+      </tr>
     </thead>
     <tbody>
       {% for c in clients %}
       <tr>
         <td><a href="/dashboard/clients/{{ c.id }}"><strong>{{ c.name }}</strong></a></td>
         <td class="mono tiny">{{ c.client_id }}</td>
+        {% if is_super %}<td class="small">{{ tenant_names[c.tenant_id] or "—" }}</td>{% endif %}
         <td class="muted">{{ c.redirect_uris | length }}</td>
         <td class="muted small">{{ c.created_at[:10] }}</td>
       </tr>
@@ -30,6 +45,8 @@
   </table>
 </div>
 {% else %}
-<div class="panel-muted"><p class="muted" style="margin:0">No clients yet. Create your first one above.</p></div>
+<div class="panel-muted"><p class="muted" style="margin:0">
+  {% if can_create %}No clients yet. Create your first one above.{% else %}No clients in your tenant yet.{% endif %}
+</p></div>
 {% endif %}
 {% endblock %}

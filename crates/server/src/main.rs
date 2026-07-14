@@ -44,6 +44,9 @@ async fn main() -> anyhow::Result<()> {
     warn_on_insecure_defaults(&config);
 
     let db = Db::connect(&config.database_url, config.database_max_connections).await?;
+    // Guarantee at least one tenant exists (covers upgrades of instances
+    // onboarded before multi-tenancy). Idempotent: only creates if none.
+    db.ensure_default_tenant().await?;
     if db.count_admins().await? == 0 {
         tracing::info!(
             "no admin yet — open {}/setup to create the super admin",

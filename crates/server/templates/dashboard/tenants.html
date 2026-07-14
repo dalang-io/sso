@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Tenants · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Tenants</h1>
+<p class="muted small mb-lg">Each tenant is an isolated workspace that owns its own OAuth clients and members.</p>
+
+<div class="panel mb-lg">
+  <h2>Create tenant</h2>
+  <form method="post" action="/dashboard/tenants" class="row wrap">
+    <input class="input" style="flex:1;min-width:12rem" name="name" required placeholder="Acme Corp" />
+    <button class="btn btn-primary">Create</button>
+  </form>
+</div>
+
+{% if tenants %}
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Clients</th><th>Members</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+      {% for t in tenants %}
+      <tr>
+        <td><strong>{{ t.name }}</strong></td>
+        <td class="muted">{{ client_counts[t.id] or 0 }}</td>
+        <td class="muted">{{ member_counts[t.id] or 0 }}</td>
+        <td class="muted small">{{ t.created_at[:10] }}</td>
+        <td style="text-align:right">
+          <form method="post" action="/dashboard/tenants/{{ t.id }}/delete"
+                onsubmit="return confirm('Delete tenant {{ t.name }}?');">
+            <button class="link-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel-muted"><p class="muted" style="margin:0">No tenants yet.</p></div>
+{% endif %}
+{% endblock %}

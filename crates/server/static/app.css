@@ -65,8 +65,11 @@ code, pre, .mono { font-family: var(--mono); }
 .site-header .container { display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; padding-bottom: 1rem; }
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 800; color: var(--black); font-size: 1.05rem; letter-spacing: -0.02em; }
 .brand:hover { text-decoration: none; }
-.brand img { display: block; height: 28px; width: 28px; object-fit: contain; border: 2px solid var(--black); background: var(--primary); }
+.brand img { display: block; height: 30px; width: auto; object-fit: contain; }
 .header-meta { display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; }
+.header-nav { display: flex; gap: 1rem; }
+.header-nav a { color: var(--black); font-weight: 700; font-size: 0.85rem; }
+.header-nav a:hover { color: var(--primary-hover); text-decoration: none; }
 
 /* ---- type ---- */
 h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.75rem; }

@@ -72,8 +72,23 @@ them when changing code:**
 - `web/` — dashboard: `mod.rs` (admin login/logout, `require_admin` guard,
   routes) and `clients.rs` (client CRUD, origins/redirect-URI editing).
 
-**Two distinct identities — do not conflate them.** `admins` manage the
-dashboard (`web/`, cookie `sso_admin`); `users` are end users who sign in to
+**Multi-tenancy + RBAC.** `tenants` are isolated workspaces that own clients.
+Dashboard users (`admins`) have a `role` and a `tenant_id`:
+- `super` — global (`tenant_id` NULL); manages tenants + members (`web/admin.rs`,
+  super-only pages `/dashboard/tenants` + `/dashboard/members`) and every client.
+- `manager` — own tenant; create/delete clients, edit config, manage secrets.
+- `developer` — own tenant; add/delete secrets only (no client CRUD/config).
+Permission logic lives on `models::Admin` (`can_manage_clients` / `_secrets` /
+`_members`, `can_access_tenant`). **Every client handler must call
+`client_in_scope` (404s cross-tenant) and re-check the role method** — the UI
+hides controls but the server is the gate (verified: developer edit/create/
+delete → 403, cross-tenant access → 404). Clients carry `tenant_id`; super's
+create form picks the tenant, managers use their own. A "Default" tenant is
+ensured at startup (`ensure_default_tenant`) so upgrades and fresh onboards
+always have somewhere to put clients.
+
+**Two distinct identities — do not conflate them.** `admins` (members) manage
+the dashboard (`web/`, cookie `sso_admin`); `users` are end users who sign in to
 relying apps (`oauth/enduser.rs`, cookie `sso_end_user`). `GET /oauth/authorize`
 shows the end-user login/registration screen when no `sso_end_user` session
 exists, then the consent screen. The authorization code's subject is taken from
