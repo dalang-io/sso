@@ -1,33 +1,32 @@
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}Dalang SSO{% endblock %}</title>
-  <!-- Dev convenience: Tailwind Play CDN + htmx. For production, compile
-       Tailwind to a static stylesheet and self-host htmx (see docs/DEPLOY.md). -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <title>{% block title %}{{ brand_title }}{% endblock %}</title>
+  <!-- Everything is served locally (no CDN / external fonts) so the UI works in
+       airgapped deployments. Favicon + logo are configurable via env. -->
+  <link rel="icon" href="/assets/favicon" type="{{ favicon_mime }}" />
+  <link rel="stylesheet" href="/assets/app.css" />
 </head>
-<body class="h-full bg-slate-50 text-slate-800">
-  <div class="min-h-full">
-    <header class="border-b border-slate-200 bg-white">
-      <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <a href="/dashboard" class="flex items-center gap-2 font-semibold text-slate-900">
-          <span class="inline-block h-6 w-6 rounded bg-indigo-600"></span>
-          Dalang SSO
-        </a>
-        {% if admin_email %}
-        <div class="flex items-center gap-4 text-sm">
-          <span class="text-slate-500">{{ admin_email }}</span>
-          <form method="post" action="/logout"><button class="text-slate-600 hover:text-slate-900">Sign out</button></form>
-        </div>
-        {% endif %}
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/dashboard" class="brand">
+        <img src="/assets/logo" alt="{{ brand_title }} logo" />
+        {{ brand_title }}
+      </a>
+      {% if admin_email %}
+      <div class="header-meta">
+        {% if admin_role == "super" %}<span class="badge badge-super">super admin</span>{% endif %}
+        <span class="muted small">{{ admin_email }}</span>
+        <form method="post" action="/logout"><button class="btn btn-sm btn-secondary">Sign out</button></form>
       </div>
-    </header>
-    <main class="mx-auto max-w-5xl px-6 py-8">
-      {% block content %}{% endblock %}
-    </main>
-  </div>
+      {% endif %}
+    </div>
+  </header>
+  <main class="container main">
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

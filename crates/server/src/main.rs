@@ -10,6 +10,7 @@
 //! These three properties are what the "100M concurrent users" target rests on:
 //! push read-heavy verification to stateless JWTs and scale nodes + DB replicas.
 
+mod assets;
 mod config;
 mod crypto;
 mod db;
@@ -61,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(|| async { Redirect::to("/dashboard") }))
         .route("/health", get(|| async { "ok" }))
+        .merge(assets::router())
         .merge(oauth::router())
         .merge(web::router())
         .layer(TraceLayer::new_for_http())

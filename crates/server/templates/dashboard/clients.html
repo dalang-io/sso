@@ -1,45 +1,35 @@
 {% extends "base.html" %}
-{% block title %}OAuth clients — Dalang SSO{% endblock %}
+{% block title %}OAuth clients · {{ brand_title }}{% endblock %}
 {% block content %}
-<div class="mb-6 flex items-center justify-between">
-  <h1 class="text-xl font-semibold text-slate-900">OAuth 2.0 Client IDs</h1>
-</div>
+<h1>OAuth 2.0 Client IDs</h1>
 
-<div class="mb-8 rounded-lg border border-slate-200 bg-white p-6">
-  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Create client</h2>
-  <form method="post" action="/dashboard/clients" class="flex gap-3">
-    <input name="name" required placeholder="My web app"
-           class="flex-1 rounded border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none" />
-    <button class="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">Create</button>
+<div class="panel mb-lg">
+  <h2>Create client</h2>
+  <form method="post" action="/dashboard/clients" class="row wrap">
+    <input class="input" style="flex:1;min-width:14rem" name="name" required placeholder="My web app" />
+    <button class="btn btn-primary">Create</button>
   </form>
 </div>
 
 {% if clients %}
-<div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-  <table class="w-full text-left text-sm">
-    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-      <tr>
-        <th class="px-4 py-3">Name</th>
-        <th class="px-4 py-3">Client ID</th>
-        <th class="px-4 py-3">Redirect URIs</th>
-        <th class="px-4 py-3">Created</th>
-      </tr>
+<div class="table-scroll">
+  <table class="table">
+    <thead>
+      <tr><th>Name</th><th>Client ID</th><th>Redirect URIs</th><th>Created</th></tr>
     </thead>
-    <tbody class="divide-y divide-slate-100">
+    <tbody>
       {% for c in clients %}
-      <tr class="hover:bg-slate-50">
-        <td class="px-4 py-3 font-medium">
-          <a href="/dashboard/clients/{{ c.id }}" class="text-indigo-600 hover:underline">{{ c.name }}</a>
-        </td>
-        <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ c.client_id }}</td>
-        <td class="px-4 py-3 text-slate-500">{{ c.redirect_uris | length }}</td>
-        <td class="px-4 py-3 text-slate-500">{{ c.created_at[:10] }}</td>
+      <tr>
+        <td><a href="/dashboard/clients/{{ c.id }}"><strong>{{ c.name }}</strong></a></td>
+        <td class="mono tiny">{{ c.client_id }}</td>
+        <td class="muted">{{ c.redirect_uris | length }}</td>
+        <td class="muted small">{{ c.created_at[:10] }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<p class="text-slate-500">No clients yet. Create your first one above.</p>
+<div class="panel-muted"><p class="muted" style="margin:0">No clients yet. Create your first one above.</p></div>
 {% endif %}
 {% endblock %}

@@ -1,5 +1,6 @@
 //! Shared application state, cloned cheaply into every request handler.
 
+use crate::assets::Brand;
 use crate::config::Config;
 use crate::db::Db;
 use crate::signing::Signer;
@@ -13,6 +14,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub db: Db,
     pub signer: Arc<Signer>,
+    pub brand: Brand,
     pub templates: Arc<Environment<'static>>,
     pub cookie_key: Key,
 }
@@ -24,11 +26,19 @@ impl AppState {
         use sha2::{Digest, Sha512};
         let expanded = Sha512::digest(config.session_secret.as_bytes());
         let cookie_key = Key::from(&expanded);
+
+        let brand = Brand::from_config(&config);
+        // Branding is available to every template without per-handler plumbing.
+        let mut env = build_templates();
+        env.add_global("brand_title", brand.title.clone());
+        env.add_global("favicon_mime", brand.favicon.content_type.clone());
+
         Self {
             config: Arc::new(config),
             db,
             signer: Arc::new(signer),
-            templates: Arc::new(build_templates()),
+            brand,
+            templates: Arc::new(env),
             cookie_key,
         }
     }

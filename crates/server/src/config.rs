@@ -19,6 +19,12 @@ pub struct Config {
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
     pub auth_code_ttl: Duration,
+    /// Branding shown in the UI. All assets are served locally (airgap-safe).
+    pub brand_title: String,
+    /// Optional path to a custom logo/icon file; falls back to the bundled logo.
+    pub logo_path: Option<String>,
+    /// Optional path to a custom favicon file; falls back to the bundled logo.
+    pub favicon_path: Option<String>,
 }
 
 impl Config {
@@ -41,6 +47,13 @@ impl Config {
             access_token_ttl: secs("SSO_ACCESS_TOKEN_TTL", 3600),
             refresh_token_ttl: secs("SSO_REFRESH_TOKEN_TTL", 2_592_000),
             auth_code_ttl: secs("SSO_AUTH_CODE_TTL", 600),
+            brand_title: env_or("SSO_BRAND_TITLE", "Dalang SSO"),
+            logo_path: std::env::var("SSO_LOGO_PATH")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            favicon_path: std::env::var("SSO_FAVICON_PATH")
+                .ok()
+                .filter(|s| !s.is_empty()),
         })
     }
 

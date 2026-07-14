@@ -1,25 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Authorize {{ client_name }}{% endblock %}
+{% block title %}Authorize {{ client_name }} · {{ brand_title }}{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-sm">
-  <h1 class="mb-1 text-xl font-semibold text-slate-900">Authorize access</h1>
-  <p class="mb-4 text-sm text-slate-600">
+<div class="container-sm">
+  <h1>Authorize access</h1>
+  <p class="muted small mb">
     <strong>{{ client_name }}</strong> wants to sign you in and access:
-    <span class="font-mono">{{ scope }}</span>
+    <span class="mono">{{ scope }}</span>
   </p>
 
-  <div class="mb-4 flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2 text-sm">
-    <span>Signed in as <strong>{{ user_email }}</strong></span>
-    <a href="/oauth/logout" class="text-indigo-600 hover:underline">Not you?</a>
+  <div class="panel-muted row between mb">
+    <span class="small">Signed in as <strong>{{ user_email }}</strong></span>
+    <a href="/oauth/logout" class="small">Not you?</a>
   </div>
 
-  <form method="post" action="/oauth/authorize" class="space-y-3 rounded-lg border border-slate-200 bg-white p-6">
+  <form method="post" action="/oauth/authorize" class="panel">
     {% for k, v in params|items %}<input type="hidden" name="{{ k }}" value="{{ v }}" />{% endfor %}
-    <div class="flex gap-3">
-      <button name="decision" value="allow"
-              class="flex-1 rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">Allow</button>
-      <button name="decision" value="deny"
-              class="flex-1 rounded border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50">Deny</button>
+    <div class="row" style="gap:.75rem">
+      <button class="btn btn-primary btn-block" name="decision" value="allow">Allow</button>
+      <button class="btn btn-secondary btn-block" name="decision" value="deny">Deny</button>
     </div>
   </form>
 </div>
