@@ -79,5 +79,10 @@ fn build_templates() -> Environment<'static> {
         include_str!("../templates/oauth/consent.html"),
     )
     .unwrap();
+    env.add_template(
+        "oauth_login.html",
+        include_str!("../templates/oauth/login.html"),
+    )
+    .unwrap();
     env
 }

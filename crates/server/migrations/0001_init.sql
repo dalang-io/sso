@@ -8,6 +8,15 @@ CREATE TABLE IF NOT EXISTS admins (
     password_hash VARCHAR(255) NOT NULL
 );
 
+-- End users: the people who sign in to relying apps through this SSO
+-- (distinct from `admins`, who manage the dashboard).
+CREATE TABLE IF NOT EXISTS users (
+    id            VARCHAR(36)  PRIMARY KEY,
+    email         VARCHAR(320) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at    VARCHAR(40)  NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS clients (
     id                 VARCHAR(36)  PRIMARY KEY,
     client_id          VARCHAR(64)  NOT NULL UNIQUE,

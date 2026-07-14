@@ -12,7 +12,7 @@
 //! they plug in behind the same method surface — see `docs/DATABASE.md`.
 
 use crate::crypto;
-use crate::models::{Admin, AuthCode, Client, RefreshToken};
+use crate::models::{Admin, AuthCode, Client, RefreshToken, User};
 use sqlx::any::{AnyPoolOptions, AnyRow};
 use sqlx::{AnyPool, Row};
 
@@ -144,6 +144,46 @@ impl Db {
             email: r.get("email"),
             password_hash: r.get("password_hash"),
         }))
+    }
+
+    // ---- end users ---------------------------------------------------------
+
+    /// Create an end user, returning the new row. Fails if the email is taken.
+    pub async fn create_user(&self, email: &str, password: &str) -> anyhow::Result<User> {
+        let user = User {
+            id: uuid::Uuid::new_v4().to_string(),
+            email: email.to_string(),
+            password_hash: crypto::hash_secret(password)?,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let sql =
+            self.q("INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)");
+        sqlx::query(&sql)
+            .bind(&user.id)
+            .bind(&user.email)
+            .bind(&user.password_hash)
+            .bind(&user.created_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(user)
+    }
+
+    pub async fn user_by_email(&self, email: &str) -> anyhow::Result<Option<User>> {
+        let sql = self.q("SELECT * FROM users WHERE email = ?");
+        let row = sqlx::query(&sql)
+            .bind(email)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| row_to_user(&r)))
+    }
+
+    pub async fn user_by_id(&self, id: &str) -> anyhow::Result<Option<User>> {
+        let sql = self.q("SELECT * FROM users WHERE id = ?");
+        let row = sqlx::query(&sql)
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| row_to_user(&r)))
     }
 
     // ---- clients -----------------------------------------------------------
@@ -308,6 +348,15 @@ fn row_to_client(r: &AnyRow) -> Client {
         name: r.get("name"),
         js_origins: serde_json::from_str(&js).unwrap_or_default(),
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
+        created_at: r.get("created_at"),
+    }
+}
+
+fn row_to_user(r: &AnyRow) -> User {
+    User {
+        id: r.get("id"),
+        email: r.get("email"),
+        password_hash: r.get("password_hash"),
         created_at: r.get("created_at"),
     }
 }

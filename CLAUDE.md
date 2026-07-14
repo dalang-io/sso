@@ -65,11 +65,21 @@ them when changing code:**
 - `state.rs` — `AppState` (cloned into every handler): config, db, signer,
   compiled templates, cookie key. Templates are **embedded** via `include_str!`
   so the binary is self-contained (no runtime template dir).
-- `oauth/` — provider endpoints: `authorize` (consent + code issuance), `token`
-  (all grants + PKCE + refresh rotation), `userinfo`, plus discovery + JWKS in
-  `mod.rs`. `Claims` and the RSA JWT helpers live in `oauth/mod.rs`.
+- `oauth/` — provider endpoints: `authorize` (end-user login/consent + code
+  issuance), `enduser` (end-user accounts + session), `token` (all grants +
+  PKCE + refresh rotation), `userinfo`, plus discovery + JWKS in `mod.rs`.
+  `Claims` and the RSA JWT helpers live in `oauth/mod.rs`.
 - `web/` — dashboard: `mod.rs` (admin login/logout, `require_admin` guard,
   routes) and `clients.rs` (client CRUD, origins/redirect-URI editing).
+
+**Two distinct identities — do not conflate them.** `admins` manage the
+dashboard (`web/`, cookie `sso_admin`); `users` are end users who sign in to
+relying apps (`oauth/enduser.rs`, cookie `sso_end_user`). `GET /oauth/authorize`
+shows the end-user login/registration screen when no `sso_end_user` session
+exists, then the consent screen. The authorization code's subject is taken from
+the **session**, never from the request body — `POST /oauth/authorize` returns
+`access_denied` if unauthenticated, so a browser cannot choose whom it logs in
+as. Both sessions are stateless signed cookies (no server-side store).
 - `db/mod.rs` — the entire storage surface (`Db`), portable SQL, placeholder
   rewriting.
 - `crypto.rs` — Argon2 hashing, token/PKCE helpers, and the **RSA** signing

@@ -40,8 +40,11 @@ client, add a redirect URI, and copy the Client ID + Secret.
      │  userInfo(token) ──────► GET /oauth/userinfo           │
 ```
 
-Supports the Authorization Code grant (with **PKCE**), refresh-token rotation,
-client-credentials, OIDC discovery, JWKS, and UserInfo.
+At `/oauth/authorize`, end users **log in or self-register** (accounts live in
+the `users` table); the issued code is bound to the authenticated user, never to
+a value the browser supplies. Supports the Authorization Code grant (with
+**PKCE**), refresh-token rotation, client-credentials, OIDC discovery, JWKS, and
+UserInfo.
 
 ## Endpoints
 

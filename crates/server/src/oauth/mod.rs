@@ -5,6 +5,7 @@
 //! and id tokens are stateless RS256 JWTs; only refresh tokens hit the DB.
 
 pub mod authorize;
+pub mod enduser;
 pub mod token;
 pub mod userinfo;
 
@@ -23,6 +24,9 @@ pub fn router() -> Router<AppState> {
             "/oauth/authorize",
             get(authorize::show).post(authorize::decide),
         )
+        .route("/oauth/login", post(enduser::login))
+        .route("/oauth/register", post(enduser::register))
+        .route("/oauth/logout", get(enduser::logout))
         .route("/oauth/token", post(token::exchange))
         .route("/oauth/userinfo", get(userinfo::userinfo))
 }

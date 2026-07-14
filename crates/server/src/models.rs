@@ -14,6 +14,17 @@ pub struct Admin {
     pub password_hash: String,
 }
 
+/// An end user who authenticates to relying apps via this SSO. Distinct from
+/// [`Admin`], who only manages the dashboard.
+#[derive(Clone, Debug, Serialize)]
+pub struct User {
+    pub id: String,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub created_at: String,
+}
+
 /// A registered OAuth 2.0 client — the equivalent of a "Google Cloud project
 /// credential". Owns its authorized origins and redirect URIs.
 #[derive(Clone, Debug, Serialize)]
