@@ -31,6 +31,18 @@ CREATE TABLE IF NOT EXISTS clients (
     created_at         VARCHAR(40)  NOT NULL
 );
 
+-- A client may hold up to 2 secrets at once (enforced in app), so they can be
+-- rotated without recreating the client. The plaintext is never stored.
+CREATE TABLE IF NOT EXISTS client_secrets (
+    id          VARCHAR(36)  PRIMARY KEY,
+    client_id   VARCHAR(36)  NOT NULL,
+    hint        VARCHAR(16)  NOT NULL,
+    secret_hash VARCHAR(255) NOT NULL,
+    created_at  VARCHAR(40)  NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_secrets_client ON client_secrets (client_id);
+
 CREATE TABLE IF NOT EXISTS auth_codes (
     code                  VARCHAR(128) PRIMARY KEY,
     client_id             VARCHAR(64)  NOT NULL,

@@ -12,7 +12,7 @@
 //! they plug in behind the same method surface — see `docs/DATABASE.md`.
 
 use crate::crypto;
-use crate::models::{Admin, AuthCode, Client, RefreshToken, User};
+use crate::models::{Admin, AuthCode, Client, ClientSecret, RefreshToken, User};
 use sqlx::any::{AnyPoolOptions, AnyRow};
 use sqlx::{AnyPool, Row};
 
@@ -229,18 +229,90 @@ impl Db {
     }
 
     pub async fn create_client(&self, client: &Client) -> anyhow::Result<()> {
+        // `client_secret_hash` is a legacy NOT NULL column kept for schema
+        // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
              (id, client_id, client_secret_hash, name, js_origins, redirect_uris, allowed_emails, created_at) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
-            .bind(&client.client_secret_hash)
+            .bind("")
             .bind(&client.name)
             .bind(serde_json::to_string(&client.js_origins)?)
             .bind(serde_json::to_string(&client.redirect_uris)?)
             .bind(serde_json::to_string(&client.allowed_emails)?)
             .bind(&client.created_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    // ---- client secrets ----------------------------------------------------
+
+    /// List a client's secrets, oldest first.
+    pub async fn list_client_secrets(
+        &self,
+        client_uuid: &str,
+    ) -> anyhow::Result<Vec<ClientSecret>> {
+        let sql =
+            self.q("SELECT * FROM client_secrets WHERE client_id = ? ORDER BY created_at ASC");
+        let rows = sqlx::query(&sql)
+            .bind(client_uuid)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_secret).collect())
+    }
+
+    /// Add a secret to a client. Returns the stored row (not the plaintext).
+    pub async fn add_client_secret(
+        &self,
+        client_uuid: &str,
+        hint: &str,
+        secret_hash: &str,
+    ) -> anyhow::Result<ClientSecret> {
+        let secret = ClientSecret {
+            id: uuid::Uuid::new_v4().to_string(),
+            client_id: client_uuid.to_string(),
+            hint: hint.to_string(),
+            secret_hash: secret_hash.to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let sql = self.q(
+            "INSERT INTO client_secrets (id, client_id, hint, secret_hash, created_at) \
+             VALUES (?, ?, ?, ?, ?)",
+        );
+        sqlx::query(&sql)
+            .bind(&secret.id)
+            .bind(&secret.client_id)
+            .bind(&secret.hint)
+            .bind(&secret.secret_hash)
+            .bind(&secret.created_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(secret)
+    }
+
+    /// Delete one secret, scoped to its client (so an id from another client can't be removed).
+    pub async fn delete_client_secret(
+        &self,
+        client_uuid: &str,
+        secret_id: &str,
+    ) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM client_secrets WHERE id = ? AND client_id = ?");
+        sqlx::query(&sql)
+            .bind(secret_id)
+            .bind(client_uuid)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Delete all of a client's secrets (used when the client itself is deleted).
+    async fn delete_client_secrets(&self, client_uuid: &str) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM client_secrets WHERE client_id = ?");
+        sqlx::query(&sql)
+            .bind(client_uuid)
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -267,6 +339,7 @@ impl Db {
     }
 
     pub async fn delete_client(&self, id: &str) -> anyhow::Result<()> {
+        self.delete_client_secrets(id).await?;
         let sql = self.q("DELETE FROM clients WHERE id = ?");
         sqlx::query(&sql).bind(id).execute(&self.pool).await?;
         Ok(())
@@ -366,11 +439,20 @@ fn row_to_client(r: &AnyRow) -> Client {
     Client {
         id: r.get("id"),
         client_id: r.get("client_id"),
-        client_secret_hash: r.get("client_secret_hash"),
         name: r.get("name"),
         js_origins: serde_json::from_str(&js).unwrap_or_default(),
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
         allowed_emails: serde_json::from_str(&emails).unwrap_or_default(),
+        created_at: r.get("created_at"),
+    }
+}
+
+fn row_to_secret(r: &AnyRow) -> ClientSecret {
+    ClientSecret {
+        id: r.get("id"),
+        client_id: r.get("client_id"),
+        hint: r.get("hint"),
+        secret_hash: r.get("secret_hash"),
         created_at: r.get("created_at"),
     }
 }

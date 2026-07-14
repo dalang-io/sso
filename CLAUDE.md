@@ -120,10 +120,19 @@ secrets or the JWT private key. `.env.example` is the committed template.
 
 ## Client secrets model
 
-`client_id` is public; the **client secret is shown exactly once** at creation
-(`client_created.html`) and only its Argon2 hash is stored. There is no endpoint
-that reveals it again — regenerate if lost. Redirect URIs are matched exactly;
-JS origins are the CORS allow-list for browser/PKCE flows.
+`client_id` is public. A client holds **up to 2 secrets** (`MAX_CLIENT_SECRETS`)
+in the `client_secrets` table — separate rows, each with its own `created_at`
+(displayed) and a short non-sensitive `hint`. Two slots enable **zero-downtime
+rotation**: add a new secret, roll it out, then delete the old one; both
+authenticate during the overlap. Each plaintext is shown **exactly once**
+(`client_created.html` for the first, `secret_created.html` for rotations);
+only Argon2 hashes are stored. The token endpoint (`oauth/token.rs`) accepts a
+presented secret if it matches **any** of the client's secrets. Rotating a
+secret does not touch the client's origins/redirect-URIs/email allow-list (a
+separate form). The legacy `clients.client_secret_hash` column is retained (kept
+`''`) for schema compatibility but unused — secrets live only in `client_secrets`.
+Redirect URIs are matched exactly; JS origins are the CORS allow-list for
+browser/PKCE flows.
 
 ## Per-client email allow-list
 

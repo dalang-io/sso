@@ -3,7 +3,7 @@
 use super::require_admin;
 use crate::crypto;
 use crate::error::{AppError, AppResult};
-use crate::models::Client;
+use crate::models::{Client, MAX_CLIENT_SECRETS};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect, Response};
@@ -11,6 +11,14 @@ use axum::Form;
 use axum_extra::extract::cookie::SignedCookieJar;
 use minijinja::context;
 use serde::Deserialize;
+
+/// Generate a fresh secret: returns (plaintext shown once, display hint, hash).
+fn generate_secret() -> (String, String, AppResult<String>) {
+    let plaintext = crypto::random_token(32);
+    let hint = format!("{}…", &plaintext[..plaintext.len().min(5)]);
+    let hash = crypto::hash_secret(&plaintext).map_err(AppError::Other);
+    (plaintext, hint, hash)
+}
 
 pub async fn list(State(state): State<AppState>, jar: SignedCookieJar) -> AppResult<Response> {
     // Unauthenticated visitors go to onboarding (no admin yet) or login.
@@ -45,12 +53,9 @@ pub async fn create(
 ) -> AppResult<Html<String>> {
     let admin = require_admin(&state, &jar).await?;
 
-    // `client_id` is public; the secret is shown once and only its hash persists.
-    let secret = crypto::random_token(32);
     let client = Client {
         id: uuid::Uuid::new_v4().to_string(),
         client_id: crypto::random_token(16),
-        client_secret_hash: crypto::hash_secret(&secret)?,
         name: form.name.trim().to_string(),
         js_origins: vec![],
         redirect_uris: vec![],
@@ -58,6 +63,13 @@ pub async fn create(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
+
+    // Issue the client's first secret; the plaintext is shown exactly once.
+    let (secret, hint, hash) = generate_secret();
+    state
+        .db
+        .add_client_secret(&client.id, &hint, &hash?)
+        .await?;
 
     let body = state.render(
         "client_created.html",
@@ -71,6 +83,57 @@ pub async fn create(
     Ok(Html(body))
 }
 
+/// POST /dashboard/clients/:id/secrets — add a secret (rotation), max 2.
+pub async fn add_secret(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<Response> {
+    let admin = require_admin(&state, &jar).await?;
+    let client = state
+        .db
+        .client_by_uuid(&id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    let secrets = state.db.list_client_secrets(&id).await?;
+    if secrets.len() >= MAX_CLIENT_SECRETS {
+        return Err(AppError::bad(format!(
+            "a client may have at most {MAX_CLIENT_SECRETS} secrets — delete one before adding another"
+        )));
+    }
+
+    let (secret, hint, hash) = generate_secret();
+    state.db.add_client_secret(&id, &hint, &hash?).await?;
+
+    let body = state.render(
+        "secret_created.html",
+        context! {
+            admin_email => admin.email,
+            id => client.id,
+            client_name => client.name,
+            client_secret => secret,
+        },
+    )?;
+    Ok(Html(body).into_response())
+}
+
+/// POST /dashboard/clients/:id/secrets/:sid/delete — remove one secret.
+pub async fn delete_secret(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path((id, sid)): Path<(String, String)>,
+) -> AppResult<Response> {
+    require_admin(&state, &jar).await?;
+    state
+        .db
+        .client_by_uuid(&id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    state.db.delete_client_secret(&id, &sid).await?;
+    Ok(Redirect::to(&format!("/dashboard/clients/{id}")).into_response())
+}
+
 pub async fn detail(
     State(state): State<AppState>,
     jar: SignedCookieJar,
@@ -82,11 +145,15 @@ pub async fn detail(
         .client_by_uuid(&id)
         .await?
         .ok_or(AppError::NotFound)?;
+    let secrets = state.db.list_client_secrets(&id).await?;
+    let can_add_secret = secrets.len() < MAX_CLIENT_SECRETS;
     let body = state.render(
         "client_detail.html",
         context! {
             admin_email => admin.email,
             client => client,
+            secrets => secrets,
+            can_add_secret => can_add_secret,
             js_origins_text => client.js_origins.join("\n"),
             redirect_uris_text => client.redirect_uris.join("\n"),
             allowed_emails_text => client.allowed_emails.join("\n"),

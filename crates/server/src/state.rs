@@ -72,6 +72,11 @@ fn build_templates() -> Environment<'static> {
     )
     .unwrap();
     env.add_template(
+        "secret_created.html",
+        include_str!("../templates/dashboard/secret_created.html"),
+    )
+    .unwrap();
+    env.add_template(
         "client_created.html",
         include_str!("../templates/dashboard/client_created.html"),
     )

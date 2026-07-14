@@ -40,9 +40,6 @@ pub struct Client {
     pub id: String,
     /// Public identifier handed to relying apps (`client_id`).
     pub client_id: String,
-    /// Argon2 hash of the secret; the plaintext is shown exactly once at creation.
-    #[serde(skip_serializing)]
-    pub client_secret_hash: String,
     pub name: String,
     /// CORS allow-list for browser (implicit/PKCE) flows.
     pub js_origins: Vec<String>,
@@ -61,6 +58,24 @@ impl Client {
     pub fn email_allowed(&self, email: &str) -> bool {
         email_allowed(email, &self.allowed_emails)
     }
+}
+
+/// The maximum number of live secrets a client may hold at once.
+pub const MAX_CLIENT_SECRETS: usize = 2;
+
+/// One of a client's secrets. The plaintext is shown exactly once at creation;
+/// only the Argon2 hash is stored, plus a short non-sensitive `hint` and the
+/// creation timestamp so admins can tell secrets apart and rotate confidently.
+#[derive(Clone, Debug, Serialize)]
+pub struct ClientSecret {
+    pub id: String,
+    /// The owning client's UUID (`clients.id`).
+    pub client_id: String,
+    /// First few characters of the secret, for display (e.g. `k3Jd…`).
+    pub hint: String,
+    #[serde(skip_serializing)]
+    pub secret_hash: String,
+    pub created_at: String,
 }
 
 /// Match an email against a list of patterns (`@domain`, `*@domain`, or an exact

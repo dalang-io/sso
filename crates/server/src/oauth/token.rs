@@ -39,7 +39,13 @@ pub async fn exchange(
         .client_by_client_id(&client_id)
         .await?
         .ok_or_else(|| AppError::oauth("invalid_client", "unknown client"))?;
-    if !crate::crypto::verify_secret(&client_secret, &client.client_secret_hash) {
+
+    // A client may hold up to two secrets (for rotation); accept any live one.
+    let secrets = state.db.list_client_secrets(&client.id).await?;
+    let ok = secrets
+        .iter()
+        .any(|s| crate::crypto::verify_secret(&client_secret, &s.secret_hash));
+    if !ok {
         return Err(AppError::oauth("invalid_client", "bad client secret"));
     }
 
