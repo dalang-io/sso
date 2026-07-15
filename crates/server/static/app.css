@@ -191,8 +191,12 @@ p { margin: 0 0 0.75rem; }
 .feature h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 0.4rem; }
 .feature p { font-size: 0.95rem; line-height: 1.6; color: #334155; margin: 0; }
 
-.band { border-top: 2px solid var(--black); border-bottom: 2px solid var(--black); background: var(--primary); }
+.band { border-top: 2px solid var(--black); border-bottom: 2px solid var(--black); background: #111827; }
 .band .container { padding: 2.5rem 1.5rem; }
+.band .section-title { color: var(--white); }
+.band .small { color: #cbd5e1; }
+/* keep the comparison table light-on-dark-band readable (white card, dark text) */
+.band .table { color: var(--ink); }
 
 .terminal { background: #111827; color: #f9fafb; border: 2px solid var(--black); box-shadow: var(--shadow); padding: 1rem 1.25rem; font-family: var(--mono); font-size: 0.85rem; overflow-x: auto; }
 .terminal .c { color: #9ca3af; }
