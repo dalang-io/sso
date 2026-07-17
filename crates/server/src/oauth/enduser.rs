@@ -25,9 +25,10 @@ pub async fn current_user(state: &AppState, jar: &SignedCookieJar) -> Option<Use
     state.db.user_by_id(&id).await.ok().flatten()
 }
 
-fn session_cookie(user_id: String) -> Cookie<'static> {
+fn session_cookie(user_id: String, secure: bool) -> Cookie<'static> {
     let mut cookie = Cookie::new(USER_COOKIE, user_id);
     cookie.set_http_only(true);
+    cookie.set_secure(secure);
     cookie.set_same_site(SameSite::Lax);
     cookie.set_path("/");
     cookie
@@ -59,7 +60,7 @@ pub async fn login(
                 let msg = super::authorize::email_denied_msg(&u.email, &client);
                 return Ok(render_login(&state, &client, &f.params, Some(&msg))?.into_response());
             }
-            let jar = jar.add(session_cookie(u.id));
+            let jar = jar.add(session_cookie(u.id, state.config.cookie_secure));
             Ok((jar, render_consent(&state, &client, &f.params, &u.email)?).into_response())
         }
         _ => Ok(render_login(
@@ -98,7 +99,7 @@ pub async fn register(
     }
 
     let user = state.db.create_user(email, &f.password).await?;
-    let jar = jar.add(session_cookie(user.id));
+    let jar = jar.add(session_cookie(user.id, state.config.cookie_secure));
     Ok((
         jar,
         render_consent(&state, &client, &f.params, &user.email)?,

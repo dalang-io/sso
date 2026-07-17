@@ -149,16 +149,28 @@ pub struct AuthCode {
     /// PKCE challenge, if the client used it (RFC 7636).
     pub code_challenge: Option<String>,
     pub code_challenge_method: Option<String>,
+    /// OIDC `nonce` from the authorization request, echoed into the id_token so
+    /// the RP can detect token replay/injection (OpenID Connect Core §3.1.2.1).
+    pub nonce: Option<String>,
     pub expires_at: String,
 }
 
 /// A persisted refresh token, exchangeable for new access tokens.
+///
+/// Rotation uses single-use consumption plus reuse detection: every token in a
+/// rotation chain shares a `family_id`, and a consumed token is kept as a
+/// tombstone (`revoked = true`) rather than deleted, so presenting an
+/// already-rotated token is detectable and revokes the whole family.
 #[derive(Clone, Debug)]
 pub struct RefreshToken {
     pub token_hash: String,
     pub client_id: String,
     pub subject: String,
     pub scope: String,
+    /// Shared id across a rotation lineage; revoking it kills every descendant.
+    pub family_id: String,
+    /// True once rotated/consumed — retained to detect reuse.
+    pub revoked: bool,
     pub expires_at: String,
 }
 

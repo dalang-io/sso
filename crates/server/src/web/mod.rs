@@ -60,10 +60,12 @@ pub async fn require_admin(state: &AppState, jar: &SignedCookieJar) -> AppResult
         .ok_or(AppError::Unauthorized)
 }
 
-/// Build the signed admin-session cookie for `admin_id`.
-fn admin_session_cookie(admin_id: String) -> Cookie<'static> {
+/// Build the signed admin-session cookie for `admin_id`. `secure` gates the
+/// `Secure` attribute (config `SSO_COOKIE_SECURE`, default true).
+fn admin_session_cookie(admin_id: String, secure: bool) -> Cookie<'static> {
     let mut cookie = Cookie::new(SESSION_COOKIE, admin_id);
     cookie.set_http_only(true);
+    cookie.set_secure(secure);
     cookie.set_same_site(SameSite::Lax);
     cookie.set_path("/");
     cookie
@@ -121,7 +123,7 @@ async fn setup(
     state.db.ensure_default_tenant().await?;
     tracing::info!(email = %admin.email, "super admin created via onboarding");
     Ok((
-        jar.add(admin_session_cookie(admin.id)),
+        jar.add(admin_session_cookie(admin.id, state.config.cookie_secure)),
         Redirect::to("/dashboard"),
     )
         .into_response())
@@ -154,7 +156,7 @@ async fn login(
     let admin = state.db.admin_by_email(&form.email).await?;
     match admin {
         Some(a) if crate::crypto::verify_secret(&form.password, &a.password_hash) => Ok((
-            jar.add(admin_session_cookie(a.id)),
+            jar.add(admin_session_cookie(a.id, state.config.cookie_secure)),
             Redirect::to("/dashboard"),
         )
             .into_response()),

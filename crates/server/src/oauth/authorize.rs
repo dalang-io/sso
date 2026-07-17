@@ -33,6 +33,9 @@ pub struct AuthzParams {
     pub code_challenge: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_challenge_method: Option<String>,
+    /// OIDC `nonce` — carried through the flow and echoed into the id_token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 impl AuthzParams {
@@ -57,6 +60,9 @@ impl AuthzParams {
         }
         if let Some(mth) = &self.code_challenge_method {
             m.insert("code_challenge_method", mth.clone());
+        }
+        if let Some(n) = &self.nonce {
+            m.insert("nonce", n.clone());
         }
         m
     }
@@ -199,6 +205,7 @@ pub async fn decide(
             subject: user.email,
             code_challenge: f.params.code_challenge,
             code_challenge_method: f.params.code_challenge_method,
+            nonce: f.params.nonce,
             expires_at: expires.to_rfc3339(),
         })
         .await?;

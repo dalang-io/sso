@@ -43,6 +43,9 @@ pub struct Claims {
     pub scope: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+    /// OIDC `nonce`, echoed into the id_token when the RP supplied one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 /// Sign a claim set as an RS256 JWT with the active `kid` (classical backend).

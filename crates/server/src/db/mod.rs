@@ -87,6 +87,9 @@ impl Db {
             "ALTER TABLE admins ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'manager'",
             "ALTER TABLE admins ADD COLUMN tenant_id VARCHAR(36)",
             "ALTER TABLE clients ADD COLUMN tenant_id VARCHAR(36)",
+            "ALTER TABLE auth_codes ADD COLUMN nonce VARCHAR(255)",
+            "ALTER TABLE refresh_tokens ADD COLUMN family_id VARCHAR(64) NOT NULL DEFAULT ''",
+            "ALTER TABLE refresh_tokens ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -437,8 +440,8 @@ impl Db {
     pub async fn insert_auth_code(&self, c: &AuthCode) -> anyhow::Result<()> {
         let sql = self.q(
             "INSERT INTO auth_codes \
-             (code, client_id, redirect_uri, scope, subject, code_challenge, code_challenge_method, expires_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+             (code, client_id, redirect_uri, scope, subject, code_challenge, code_challenge_method, nonce, expires_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         );
         sqlx::query(&sql)
             .bind(&c.code)
@@ -448,6 +451,7 @@ impl Db {
             .bind(&c.subject)
             .bind(&c.code_challenge)
             .bind(&c.code_challenge_method)
+            .bind(&c.nonce)
             .bind(&c.expires_at)
             .execute(&self.pool)
             .await?;
@@ -455,15 +459,27 @@ impl Db {
     }
 
     /// Fetch and atomically consume an auth code (single-use, RFC 6749 §4.1.2).
+    ///
+    /// The DELETE is the point of serialization: under concurrent redemption of
+    /// the same code, exactly one caller sees `rows_affected == 1` and receives
+    /// the code; every other caller sees 0 and is told the code is unknown/used.
+    /// This closes the SELECT-then-DELETE replay race.
     pub async fn take_auth_code(&self, code: &str) -> anyhow::Result<Option<AuthCode>> {
         let sql = self.q("SELECT * FROM auth_codes WHERE code = ?");
-        let row = sqlx::query(&sql)
+        let Some(r) = sqlx::query(&sql)
             .bind(code)
             .fetch_optional(&self.pool)
-            .await?;
+            .await?
+        else {
+            return Ok(None);
+        };
         let del = self.q("DELETE FROM auth_codes WHERE code = ?");
-        sqlx::query(&del).bind(code).execute(&self.pool).await?;
-        Ok(row.map(|r| AuthCode {
+        let res = sqlx::query(&del).bind(code).execute(&self.pool).await?;
+        if res.rows_affected() != 1 {
+            // A concurrent request already claimed this code.
+            return Ok(None);
+        }
+        Ok(Some(AuthCode {
             code: r.get("code"),
             client_id: r.get("client_id"),
             redirect_uri: r.get("redirect_uri"),
@@ -471,6 +487,7 @@ impl Db {
             subject: r.get("subject"),
             code_challenge: r.get("code_challenge"),
             code_challenge_method: r.get("code_challenge_method"),
+            nonce: r.try_get("nonce").ok(),
             expires_at: r.get("expires_at"),
         }))
     }
@@ -479,20 +496,24 @@ impl Db {
 
     pub async fn insert_refresh_token(&self, t: &RefreshToken) -> anyhow::Result<()> {
         let sql = self.q(
-            "INSERT INTO refresh_tokens (token_hash, client_id, subject, scope, expires_at) \
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO refresh_tokens (token_hash, client_id, subject, scope, family_id, revoked, expires_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
         );
         sqlx::query(&sql)
             .bind(&t.token_hash)
             .bind(&t.client_id)
             .bind(&t.subject)
             .bind(&t.scope)
+            .bind(&t.family_id)
+            .bind(i32::from(t.revoked))
             .bind(&t.expires_at)
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
+    /// Look up a refresh token by hash, including revoked tombstones (the caller
+    /// needs to see `revoked` to detect reuse).
     pub async fn refresh_token(&self, token_hash: &str) -> anyhow::Result<Option<RefreshToken>> {
         let sql = self.q("SELECT * FROM refresh_tokens WHERE token_hash = ?");
         let row = sqlx::query(&sql)
@@ -504,14 +525,34 @@ impl Db {
             client_id: r.get("client_id"),
             subject: r.get("subject"),
             scope: r.get("scope"),
+            family_id: r.try_get("family_id").unwrap_or_default(),
+            revoked: r.try_get::<i64, _>("revoked").unwrap_or(0) != 0,
             expires_at: r.get("expires_at"),
         }))
     }
 
-    pub async fn delete_refresh_token(&self, token_hash: &str) -> anyhow::Result<()> {
-        let sql = self.q("DELETE FROM refresh_tokens WHERE token_hash = ?");
-        sqlx::query(&sql)
+    /// Atomically consume (rotate) a refresh token by flipping `revoked` 0→1.
+    /// Returns true only for the single caller that won the flip; a false result
+    /// means the token was already consumed (concurrent rotation or replay). The
+    /// tombstone row is kept so a later reuse of the same token is detectable.
+    pub async fn consume_refresh_token(&self, token_hash: &str) -> anyhow::Result<bool> {
+        let sql =
+            self.q("UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ? AND revoked = 0");
+        let res = sqlx::query(&sql)
             .bind(token_hash)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() == 1)
+    }
+
+    /// Revoke every token in a rotation lineage — used when reuse is detected.
+    pub async fn revoke_refresh_family(&self, family_id: &str) -> anyhow::Result<()> {
+        if family_id.is_empty() {
+            return Ok(());
+        }
+        let sql = self.q("UPDATE refresh_tokens SET revoked = 1 WHERE family_id = ?");
+        sqlx::query(&sql)
+            .bind(family_id)
             .execute(&self.pool)
             .await?;
         Ok(())

@@ -22,6 +22,8 @@ mod site;
 mod state;
 mod web;
 
+use axum::http::{HeaderName, HeaderValue};
+use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use config::Config;
@@ -41,7 +43,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_env()?;
-    warn_on_insecure_defaults(&config);
+    // Fail closed on insecure defaults when exposed beyond loopback.
+    config.validate()?;
 
     let db = Db::connect(&config.database_url, config.database_max_connections).await?;
     // Guarantee at least one tenant exists (covers upgrades of instances
@@ -68,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(assets::router())
         .merge(oauth::router())
         .merge(web::router())
+        .layer(axum::middleware::map_response(security_headers))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -79,13 +83,55 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn warn_on_insecure_defaults(config: &Config) {
-    if config.session_secret.starts_with("dev-insecure") {
-        tracing::warn!("SSO_SESSION_SECRET is a dev default — set a strong secret for production");
+/// Attach defensive security headers to every response. `frame-ancestors 'none'`
+/// (plus `X-Frame-Options`) is the key defense against clickjacking of the OAuth
+/// consent screen; it does not restrict resource loading, so it won't break the
+/// dashboard's inline styles/scripts. HSTS is safe because the browser-facing
+/// origin is always HTTPS (TLS terminated at the proxy).
+async fn security_headers(mut res: Response) -> Response {
+    const HEADERS: [(&str, &str); 5] = [
+        ("x-frame-options", "DENY"),
+        ("content-security-policy", "frame-ancestors 'none'"),
+        ("x-content-type-options", "nosniff"),
+        ("referrer-policy", "no-referrer"),
+        (
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains",
+        ),
+    ];
+    let h = res.headers_mut();
+    for (name, value) in HEADERS {
+        // Don't clobber a header a handler set deliberately.
+        if !h.contains_key(name) {
+            h.insert(
+                HeaderName::from_static(name),
+                HeaderValue::from_static(value),
+            );
+        }
     }
+    res
 }
 
+/// Resolve when the process receives SIGINT (Ctrl-C) or SIGTERM (`systemctl
+/// restart`), so in-flight token/refresh requests drain instead of being killed.
 async fn shutdown_signal() {
-    let _ = tokio::signal::ctrl_c().await;
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            sig.recv().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
     tracing::info!("shutdown signal received");
 }

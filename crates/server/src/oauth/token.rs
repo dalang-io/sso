@@ -53,7 +53,18 @@ pub async fn exchange(
         "authorization_code" => auth_code_grant(&state, &client, &form).await,
         "refresh_token" => refresh_grant(&state, &client, &form).await,
         "client_credentials" => Ok(Json(
-            issue(&state, &client, &client.client_id, &form.scope, false).await?,
+            // Machine-to-machine: no end user, so never an id_token/nonce and a
+            // fresh (unused) refresh family is irrelevant since with_refresh=false.
+            issue(
+                &state,
+                &client,
+                &client.client_id,
+                &form.scope,
+                false,
+                None,
+                None,
+            )
+            .await?,
         )),
         other => Err(AppError::oauth(
             "unsupported_grant_type",
@@ -107,8 +118,18 @@ async fn auth_code_grant(
         }
     }
 
+    // A brand-new consent starts a fresh rotation family (None → issue() mints one).
     Ok(Json(
-        issue(state, client, &stored.subject, &stored.scope, true).await?,
+        issue(
+            state,
+            client,
+            &stored.subject,
+            &stored.scope,
+            true,
+            stored.nonce.as_deref(),
+            None,
+        )
+        .await?,
     ))
 }
 
@@ -127,26 +148,65 @@ async fn refresh_grant(
         .refresh_token(&hash)
         .await?
         .ok_or_else(|| AppError::oauth("invalid_grant", "unknown refresh token"))?;
+
+    // Reuse detection: presenting an already-rotated (tombstoned) token means the
+    // token was leaked and replayed. Revoke the entire rotation family — the
+    // legitimate holder will re-authenticate — and refuse.
+    if stored.revoked {
+        state.db.revoke_refresh_family(&stored.family_id).await?;
+        tracing::warn!(
+            client_id = %client.client_id,
+            family = %stored.family_id,
+            "refresh token reuse detected — revoked family"
+        );
+        return Err(AppError::oauth(
+            "invalid_grant",
+            "refresh token reuse detected",
+        ));
+    }
     if stored.client_id != client.client_id || expired(&stored.expires_at) {
         return Err(AppError::oauth(
             "invalid_grant",
             "refresh token invalid or expired",
         ));
     }
-    // Rotate: the old token is single-use.
-    state.db.delete_refresh_token(&hash).await?;
+
+    // Rotate atomically: only the request that flips revoked 0→1 wins. A lost
+    // race means a concurrent rotation/replay — treat it as reuse and revoke.
+    if !state.db.consume_refresh_token(&hash).await? {
+        state.db.revoke_refresh_family(&stored.family_id).await?;
+        return Err(AppError::oauth(
+            "invalid_grant",
+            "refresh token reuse detected",
+        ));
+    }
+
+    // New token stays in the same family so the chain remains linkable.
     Ok(Json(
-        issue(state, client, &stored.subject, &stored.scope, true).await?,
+        issue(
+            state,
+            client,
+            &stored.subject,
+            &stored.scope,
+            true,
+            None,
+            Some(&stored.family_id),
+        )
+        .await?,
     ))
 }
 
 /// Mint an access token (+ optional id_token and rotating refresh token).
+/// `nonce` (if any) is echoed into the id_token; `refresh_family` continues an
+/// existing rotation lineage, or `None` starts a new one.
 async fn issue(
     state: &AppState,
     client: &Client,
     subject: &str,
     scope: &str,
     with_refresh: bool,
+    nonce: Option<&str>,
+    refresh_family: Option<&str>,
 ) -> AppResult<TokenResponse> {
     let now = chrono::Utc::now().timestamp();
     let ttl = state.config.access_token_ttl.as_secs() as i64;
@@ -162,6 +222,7 @@ async fn issue(
             iat: now,
             scope: scope.to_string(),
             email: None,
+            nonce: None,
         })
         .map_err(AppError::Other)?;
 
@@ -177,6 +238,7 @@ async fn issue(
                     iat: now,
                     scope: String::new(),
                     email: Some(subject.to_string()),
+                    nonce: nonce.map(str::to_string),
                 })
                 .map_err(AppError::Other)?,
         )
@@ -193,6 +255,11 @@ async fn issue(
             client_id: client.client_id.clone(),
             subject: subject.to_string(),
             scope: scope.to_string(),
+            // Continue the presented token's family, or start a new lineage.
+            family_id: refresh_family
+                .map(str::to_string)
+                .unwrap_or_else(|| crate::crypto::random_token(16)),
+            revoked: false,
             expires_at: expires.to_rfc3339(),
         };
         // Persist before returning so the token is usable immediately.

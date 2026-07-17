@@ -65,14 +65,20 @@ CREATE TABLE IF NOT EXISTS auth_codes (
     subject               VARCHAR(64)  NOT NULL,
     code_challenge        VARCHAR(128),
     code_challenge_method VARCHAR(8),
+    nonce                 VARCHAR(255),
     expires_at            VARCHAR(40)  NOT NULL
 );
 
+-- Refresh tokens rotate on use. Each token in a rotation chain shares family_id;
+-- a consumed token is kept with revoked=1 (a tombstone) so replay of an already
+-- rotated token is detectable and revokes the whole family.
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     token_hash VARCHAR(64)  PRIMARY KEY,
     client_id  VARCHAR(64)  NOT NULL,
     subject    VARCHAR(64)  NOT NULL,
     scope      VARCHAR(1024) NOT NULL,
+    family_id  VARCHAR(64)  NOT NULL DEFAULT '',
+    revoked    INTEGER      NOT NULL DEFAULT 0,
     expires_at VARCHAR(40)  NOT NULL
 );
 
