@@ -26,11 +26,25 @@ secrets before the first real start**:
 ```bash
 ssh root@163.128.55.121
 cd /opt/dalang-sso
-openssl rand -hex 32                 # -> SSO_SESSION_SECRET
+openssl rand -hex 32                 # -> paste into SSO_SESSION_SECRET
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt_private.pem
-$EDITOR .env                         # set secrets, SSO_PUBLIC_URL, DATABASE_URL, admin creds
+$EDITOR .env                         # set SSO_SESSION_SECRET, SSO_JWT_PRIVATE_KEY_PATH,
+                                     # SSO_PUBLIC_URL, DATABASE_URL
 systemctl restart sso
 ```
+
+There is **no default admin**. After the first start, open
+`<SSO_PUBLIC_URL>/setup` in a browser to create the super admin account (a
+one-time page that disables itself once any admin exists). Keep `/setup`
+unreachable from the public internet until you've completed it.
+
+### Prefer a prebuilt binary?
+
+You don't have to build from source. Download the matching asset from the
+[latest release](https://github.com/dalang-io/sso/releases/latest) (e.g.
+`sso-linux-x86_64`, verify its `.sha256`), drop it at `/opt/dalang-sso/sso`, and
+use the same `.env` + systemd unit. `deploy/deploy.sh` builds from source; the
+release binaries are the no-toolchain alternative.
 
 ## TLS / reverse proxy (required for real use)
 
