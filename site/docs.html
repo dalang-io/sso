@@ -42,6 +42,7 @@
         <a href="#endpoints">Endpoints</a>
         <a href="#sdks">SDKs</a>
         <strong>Operate</strong>
+        <a href="#security">Security</a>
         <a href="#config">Configuration</a>
         <a href="#deploy">Self-hosting</a>
         <a href="#pqc">Post-quantum</a>
@@ -97,7 +98,8 @@ App ──3 POST /oauth/token (code + client_secret + PKCE) ──▸ SSO
 App ◀─4 access_token + id_token + refresh_token (JWT) ────── SSO
 App ──5 GET /oauth/userinfo (Bearer access_token) ────────▸ SSO ──▸ { sub, email }</pre>
         <p>Access and id tokens are self-verifying <strong>RS256 JWTs</strong> — verify them against the
-        JWKS without a round-trip. Refresh tokens rotate on every use.</p>
+        JWKS without a round-trip. Refresh tokens rotate on every use, with reuse detection (see
+        <a href="#security">Security</a>).</p>
 
         <h2 id="endpoints">Endpoints</h2>
         <table>
@@ -108,6 +110,8 @@ App ──5 GET /oauth/userinfo (Bearer access_token) ────────�
             <tr><td><code>/oauth/authorize</code></td><td>Authorization + login + consent</td></tr>
             <tr><td><code>/oauth/token</code></td><td>Token endpoint (all grants)</td></tr>
             <tr><td><code>/oauth/userinfo</code></td><td>UserInfo (Bearer access token)</td></tr>
+            <tr><td><code>/dashboard</code></td><td>Admin dashboard (manage apps)</td></tr>
+            <tr><td><code>/setup</code></td><td>One-time first-admin onboarding</td></tr>
           </tbody>
         </table>
 
@@ -144,6 +148,29 @@ tokens, _ := sso.ExchangeCode(code, pkce)
 me, _ := sso.UserInfo(tokens.AccessToken)</pre>
         <p>Rust, Java and PHP follow the same API — see each SDK’s README.</p>
 
+        <h2 id="security">Security</h2>
+        <p>Dalang SSO is hardened by default — safe to expose without extra tuning:</p>
+        <ul>
+          <li><strong>Authorization Code + PKCE</strong>, single-use authorization codes that are
+          consumed atomically (no replay race), and the code's subject is bound to the authenticated
+          session — a client can never choose whom it logs in as.</li>
+          <li><strong>Refresh-token rotation with reuse detection.</strong> Every rotation issues a new
+          token in a lineage; replaying an already-rotated token revokes the entire token family and is
+          rejected — a stolen refresh token can't be used behind the user's back.</li>
+          <li><strong>Stateless JWT verification</strong> (RS256 or post-quantum ML-DSA) — tokens verify
+          against the JWKS without a database round-trip.</li>
+          <li><strong>Per-client email allow-lists</strong> — restrict an app to <code>@yourco.com</code>,
+          <code>*@example.com</code>, or a single address (empty = allow all, with a dashboard warning).</li>
+          <li><strong>Hardened HTTP</strong> — <code>Secure</code> session cookies, clickjacking protection
+          on the consent screen (<code>X-Frame-Options</code> / CSP <code>frame-ancestors</code>), HSTS,
+          and <code>nosniff</code> on every response.</li>
+          <li><strong>Fail-closed secrets</strong> — the server refuses to start with a placeholder
+          session secret when bound to a non-loopback address, so a misconfigured deploy can't ship a
+          world-known cookie key.</li>
+          <li><strong>Argon2id</strong> password/secret hashing; secrets stored only as hashes and shown
+          in plaintext exactly once.</li>
+        </ul>
+
         <h2 id="config">Configuration</h2>
         <p>All configuration is environment variables (via <code>.env</code>). Common ones:</p>
         <table>
@@ -152,6 +179,8 @@ me, _ := sso.UserInfo(tokens.AccessToken)</pre>
             <tr><td><code>SSO_BIND_ADDR</code></td><td><code>127.0.0.1:8080</code></td><td>Listen address</td></tr>
             <tr><td><code>SSO_PUBLIC_URL</code></td><td><code>http://localhost:8080</code></td><td>Public origin / OIDC issuer</td></tr>
             <tr><td><code>DATABASE_URL</code></td><td><code>sqlite://data/sso.db</code></td><td>SQLite / Postgres / MySQL</td></tr>
+            <tr><td><code>SSO_SESSION_SECRET</code></td><td>dev default</td><td>Cookie signing key — <strong>required</strong> in production</td></tr>
+            <tr><td><code>SSO_JWT_PRIVATE_KEY_PATH</code></td><td>ephemeral</td><td>Persistent RSA key — set so tokens survive restarts</td></tr>
             <tr><td><code>SSO_TOKEN_SIGNING_ALG</code></td><td><code>rs256</code></td><td><code>rs256</code> or <code>ml-dsa-65</code> (PQC)</td></tr>
             <tr><td><code>SSO_BRAND_TITLE</code></td><td><code>Dalang SSO</code></td><td>Dashboard title</td></tr>
             <tr><td><code>SSO_LOGO_PATH</code> / <code>SSO_FAVICON_PATH</code></td><td>bundled</td><td>Custom local branding</td></tr>

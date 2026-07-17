@@ -412,7 +412,7 @@ dependencies = [
 
 [[package]]
 name = "dalang-sso"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64",
  "rand 0.8.7",
@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "sso-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "argon2",
