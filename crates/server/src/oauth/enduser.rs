@@ -9,8 +9,10 @@
 use super::authorize::{render_consent, render_login, validate, AuthzParams};
 use crate::error::AppResult;
 use crate::models::User;
+use crate::security;
 use crate::state::AppState;
 use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Redirect};
 use axum::Form;
 use axum_extra::extract::cookie::{Cookie, SameSite, SignedCookieJar};
@@ -48,13 +50,25 @@ pub struct CredsForm {
 pub async fn login(
     State(state): State<AppState>,
     jar: SignedCookieJar,
+    headers: HeaderMap,
     Form(f): Form<CredsForm>,
 ) -> AppResult<impl IntoResponse> {
     let client = validate(&state, &f.params).await?;
 
+    // Brute-force guard: budget per client IP and per account.
+    if !security::auth_allowed(&state.rate_limiter, &headers, Some(f.email.trim())) {
+        return Ok((
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many sign-in attempts. Please try again later.",
+        )
+            .into_response());
+    }
+
     let user = state.db.user_by_email(f.email.trim()).await?;
     match user {
         Some(u) if crate::crypto::verify_secret(&f.password, &u.password_hash) => {
+            // Legit login — reset any earlier-failure budget for this account.
+            state.rate_limiter.clear(&format!("acct:{}", u.email));
             // Authenticated — now check this client's email allow-list.
             if !client.email_allowed(&u.email) {
                 let msg = super::authorize::email_denied_msg(&u.email, &client);
@@ -77,10 +91,20 @@ pub async fn login(
 pub async fn register(
     State(state): State<AppState>,
     jar: SignedCookieJar,
+    headers: HeaderMap,
     Form(f): Form<CredsForm>,
 ) -> AppResult<impl IntoResponse> {
     let client = validate(&state, &f.params).await?;
     let email = f.email.trim();
+
+    // Mass-account-creation guard (per IP, and per destination email).
+    if !security::auth_allowed(&state.rate_limiter, &headers, Some(email)) {
+        return Ok((
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many attempts. Please try again later.",
+        )
+            .into_response());
+    }
 
     let err: Option<String> = if !email.contains('@') {
         Some("Enter a valid email address".into())

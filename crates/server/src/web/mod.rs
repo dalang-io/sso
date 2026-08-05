@@ -8,8 +8,10 @@ pub mod clients;
 
 use crate::error::{AppError, AppResult};
 use crate::models::Admin;
+use crate::security;
 use crate::state::AppState;
 use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Form, Router};
@@ -93,11 +95,20 @@ async fn setup_page(State(state): State<AppState>) -> AppResult<Response> {
 async fn setup(
     State(state): State<AppState>,
     jar: SignedCookieJar,
+    headers: HeaderMap,
     Form(form): Form<SetupForm>,
 ) -> AppResult<Response> {
     // Guard against a race / repeat submission: onboarding runs exactly once.
     if state.db.count_admins().await? > 0 {
         return Ok(Redirect::to("/login").into_response());
+    }
+    // Onboarding creates credentials; budget per client IP too.
+    if !security::auth_allowed(&state.rate_limiter, &headers, None) {
+        return Ok((
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many attempts. Please try again later.",
+        )
+            .into_response());
     }
 
     let email = form.email.trim();
@@ -148,18 +159,31 @@ struct LoginForm {
 async fn login(
     State(state): State<AppState>,
     jar: SignedCookieJar,
+    headers: HeaderMap,
     Form(form): Form<LoginForm>,
 ) -> AppResult<impl IntoResponse> {
     if state.db.count_admins().await? == 0 {
         return Ok(Redirect::to("/setup").into_response());
     }
+    // Brute-force guard: budget per client IP and per account.
+    if !security::auth_allowed(&state.rate_limiter, &headers, Some(&form.email)) {
+        return Ok((
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many sign-in attempts. Please try again later.",
+        )
+            .into_response());
+    }
     let admin = state.db.admin_by_email(&form.email).await?;
     match admin {
-        Some(a) if crate::crypto::verify_secret(&form.password, &a.password_hash) => Ok((
-            jar.add(admin_session_cookie(a.id, state.config.cookie_secure)),
-            Redirect::to("/dashboard"),
-        )
-            .into_response()),
+        Some(a) if crate::crypto::verify_secret(&form.password, &a.password_hash) => {
+            // Legit login — reset any earlier-failure budget for this account.
+            state.rate_limiter.clear(&format!("acct:{}", a.email));
+            Ok((
+                jar.add(admin_session_cookie(a.id, state.config.cookie_secure)),
+                Redirect::to("/dashboard"),
+            )
+                .into_response())
+        }
         _ => {
             let body = state.render(
                 "login.html",

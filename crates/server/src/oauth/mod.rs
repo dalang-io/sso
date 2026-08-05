@@ -16,10 +16,17 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
+/// Public (cookie-free) OAuth routes: discovery + JWKS.
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/.well-known/openid-configuration", get(discovery))
         .route("/.well-known/jwks.json", get(jwks))
+}
+
+/// Browser-facing OAuth routes (login/consent/register). These carry cookies
+/// and must be behind the CSRF middleware — never the machine `/oauth/token`.
+pub fn browser_router() -> Router<AppState> {
+    Router::new()
         .route(
             "/oauth/authorize",
             get(authorize::show).post(authorize::decide),
@@ -27,6 +34,12 @@ pub fn router() -> Router<AppState> {
         .route("/oauth/login", post(enduser::login))
         .route("/oauth/register", post(enduser::register))
         .route("/oauth/logout", get(enduser::logout))
+}
+
+/// Machine-to-machine OAuth routes (token exchange, userinfo). No cookies, so
+/// no CSRF — these stay outside the browser router.
+pub fn api_router() -> Router<AppState> {
+    Router::new()
         .route("/oauth/token", post(token::exchange))
         .route("/oauth/userinfo", get(userinfo::userinfo))
 }

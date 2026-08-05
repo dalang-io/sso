@@ -3,6 +3,7 @@
 use crate::assets::Brand;
 use crate::config::Config;
 use crate::db::Db;
+use crate::security::RateLimiter;
 use crate::signing::Signer;
 use axum::extract::FromRef;
 use axum_extra::extract::cookie::Key;
@@ -17,6 +18,8 @@ pub struct AppState {
     pub brand: Brand,
     pub templates: Arc<Environment<'static>>,
     pub cookie_key: Key,
+    /// In-memory rate limiter for credential endpoints (per-node budget).
+    pub rate_limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -43,6 +46,7 @@ impl AppState {
             brand,
             templates: Arc::new(env),
             cookie_key,
+            rate_limiter: Arc::new(RateLimiter::new()),
         }
     }
 

@@ -54,6 +54,25 @@
     </div>
   </div>
   <script>
+  // Double-submit CSRF: read the sso_csrf cookie (set by the server) and echo its
+  // value into every POST form as a hidden `_csrf` field. The server middleware
+  // rejects any state-changing request whose token does not match the cookie.
+  (function () {
+    function csrfToken() {
+      var m = document.cookie.match(/(?:^|;\s*)sso_csrf=([^;]*)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    var t = csrfToken();
+    if (!t) return;
+    document.querySelectorAll('form[method="post"]').forEach(function (f) {
+      if (f.querySelector('input[name="_csrf"]')) return;
+      var i = document.createElement('input');
+      i.type = 'hidden'; i.name = '_csrf'; i.value = t;
+      f.appendChild(i);
+    });
+  })();
+  </script>
+  <script>
   (function () {
     var modal = document.getElementById('confirmModal'),
         msg = document.getElementById('confirmMsg'),

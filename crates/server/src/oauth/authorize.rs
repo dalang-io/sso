@@ -10,7 +10,7 @@ use super::enduser::current_user;
 use crate::error::{AppError, AppResult};
 use crate::models::{AuthCode, Client};
 use crate::state::AppState;
-use axum::extract::{Query, State};
+use axum::extract::{RawQuery, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::Form;
 use axum_extra::extract::cookie::SignedCookieJar;
@@ -140,8 +140,20 @@ pub(super) fn email_denied_msg(email: &str, client: &Client) -> String {
 pub async fn show(
     State(state): State<AppState>,
     jar: SignedCookieJar,
-    Query(p): Query<AuthzParams>,
+    RawQuery(q): RawQuery,
 ) -> AppResult<Html<String>> {
+    // Parse manually (instead of via the Query extractor) so a malformed request
+    // returns a generic OAuth error rather than leaking serde's field names.
+    let p: AuthzParams = match q {
+        Some(q) => serde_urlencoded::from_str(&q)
+            .map_err(|_| AppError::oauth("invalid_request", "malformed authorization request"))?,
+        None => {
+            return Err(AppError::oauth(
+                "invalid_request",
+                "missing request parameters",
+            ))
+        }
+    };
     let client = validate(&state, &p).await?;
     match current_user(&state, &jar).await {
         // Signed in but not on this client's allow-list: offer another account.

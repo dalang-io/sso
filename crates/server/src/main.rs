@@ -17,6 +17,7 @@ mod db;
 mod error;
 mod models;
 mod oauth;
+mod security;
 mod signing;
 mod site;
 mod state;
@@ -65,12 +66,23 @@ async fn main() -> anyhow::Result<()> {
     let bind = config.bind_addr.clone();
     let state = AppState::new(config, db, signer);
 
+    // Browser-facing routes carry cookies → require the CSRF middleware.
+    let browser = Router::new()
+        .merge(web::router())
+        .merge(oauth::browser_router())
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            security::csrf_guard,
+        ));
+
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
         .merge(site::router())
         .merge(assets::router())
+        // Cookie-free machine/public endpoints (no CSRF).
         .merge(oauth::router())
-        .merge(web::router())
+        .merge(oauth::api_router())
+        .merge(browser)
         .layer(axum::middleware::map_response(security_headers))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
