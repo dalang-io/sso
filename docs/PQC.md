@@ -64,8 +64,10 @@ of the two schemes is later weakened.
 
 ## 3. Roadmap
 
-- Persisted ML-DSA signing keys + rotation (today an ephemeral key is generated
-  at boot when none is configured).
+- Rotating identities / multi-key JWKS with graceful key rotation. (Persisted
+  ML-DSA keys now exist: set `SSO_MLDSA_KEY_PATH` to keep the key across
+  restarts and share it across nodes; without it an ephemeral key is generated
+  at boot.)
 - Hybrid **signatures** (RSA + ML-DSA dual-sign) for zero-downtime migration of
   relying parties.
 - Native TLS in the server with a hybrid KEM (removing the proxy requirement).

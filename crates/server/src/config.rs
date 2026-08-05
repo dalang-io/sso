@@ -18,6 +18,10 @@ pub struct Config {
     /// `SSO_COOKIE_SECURE=false` only for local plain-HTTP development.
     pub cookie_secure: bool,
     pub jwt_private_key_path: Option<String>,
+    /// Optional path to a persisted ML-DSA-65 keypair (see `SSO_MLDSA_KEY_PATH`).
+    /// When set, the key survives restarts and is shared across nodes — required
+    /// for production `ml-dsa-65` signing. If unset, an ephemeral key is used.
+    pub mldsa_key_path: Option<String>,
     /// Token signing algorithm: `rs256` (default, max interop) or `ml-dsa-65`
     /// (post-quantum, FIPS 204).
     pub token_signing_alg: String,
@@ -47,6 +51,9 @@ impl Config {
             ),
             cookie_secure: env_or("SSO_COOKIE_SECURE", "true") != "false",
             jwt_private_key_path: std::env::var("SSO_JWT_PRIVATE_KEY_PATH")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            mldsa_key_path: std::env::var("SSO_MLDSA_KEY_PATH")
                 .ok()
                 .filter(|s| !s.is_empty()),
             token_signing_alg: env_or("SSO_TOKEN_SIGNING_ALG", "rs256").to_lowercase(),
@@ -132,6 +139,7 @@ mod tests {
             session_secret: secret.into(),
             cookie_secure: true,
             jwt_private_key_path: None,
+            mldsa_key_path: None,
             token_signing_alg: "rs256".into(),
             access_token_ttl: Duration::from_secs(60),
             refresh_token_ttl: Duration::from_secs(60),

@@ -61,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let signer = Signer::from_config(
         &config.token_signing_alg,
         config.jwt_private_key_path.as_deref(),
+        config.mldsa_key_path.as_deref(),
     )?;
 
     let bind = config.bind_addr.clone();
