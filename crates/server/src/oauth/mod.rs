@@ -6,6 +6,7 @@
 
 pub mod authorize;
 pub mod enduser;
+pub mod introspect;
 pub mod token;
 pub mod userinfo;
 
@@ -41,6 +42,7 @@ pub fn browser_router() -> Router<AppState> {
 pub fn api_router() -> Router<AppState> {
     Router::new()
         .route("/oauth/token", post(token::exchange))
+        .route("/oauth/introspect", post(introspect::introspect))
         .route("/oauth/userinfo", get(userinfo::userinfo))
 }
 

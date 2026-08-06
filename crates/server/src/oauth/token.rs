@@ -31,23 +31,13 @@ pub async fn exchange(
     headers: HeaderMap,
     Form(form): Form<TokenForm>,
 ) -> AppResult<Json<TokenResponse>> {
-    let (client_id, client_secret) = client_credentials(&headers, &form)
-        .ok_or_else(|| AppError::oauth("invalid_client", "missing client credentials"))?;
-
-    let client = state
-        .db
-        .client_by_client_id(&client_id)
-        .await?
-        .ok_or_else(|| AppError::oauth("invalid_client", "unknown client"))?;
-
-    // A client may hold up to two secrets (for rotation); accept any live one.
-    let secrets = state.db.list_client_secrets(&client.id).await?;
-    let ok = secrets
-        .iter()
-        .any(|s| crate::crypto::verify_secret(&client_secret, &s.secret_hash));
-    if !ok {
-        return Err(AppError::oauth("invalid_client", "bad client secret"));
-    }
+    let client = authenticate_client(
+        &state,
+        &headers,
+        form.client_id.as_deref(),
+        form.client_secret.as_deref(),
+    )
+    .await?;
 
     match form.grant_type.as_str() {
         "authorization_code" => auth_code_grant(&state, &client, &form).await,
@@ -331,11 +321,42 @@ async fn issue(
     })
 }
 
+/// Authenticate a confidential client via the form (`client_secret_post`) or an
+/// `Authorization: Basic` header, verifying against any of its live secrets.
+/// Shared by `/oauth/token` and `/oauth/introspect`.
+pub async fn authenticate_client(
+    state: &AppState,
+    headers: &HeaderMap,
+    client_id: Option<&str>,
+    client_secret: Option<&str>,
+) -> AppResult<Client> {
+    let (id, secret) = client_credentials(headers, client_id, client_secret)
+        .ok_or_else(|| AppError::oauth("invalid_client", "missing client credentials"))?;
+    let client = state
+        .db
+        .client_by_client_id(&id)
+        .await?
+        .ok_or_else(|| AppError::oauth("invalid_client", "unknown client"))?;
+    // A client may hold up to two secrets (for rotation); accept any live one.
+    let secrets = state.db.list_client_secrets(&client.id).await?;
+    let ok = secrets
+        .iter()
+        .any(|s| crate::crypto::verify_secret(&secret, &s.secret_hash));
+    if !ok {
+        return Err(AppError::oauth("invalid_client", "bad client secret"));
+    }
+    Ok(client)
+}
+
 /// Resolve client credentials from the form (`client_secret_post`) or from a
 /// `client_secret_basic` Authorization header.
-fn client_credentials(headers: &HeaderMap, form: &TokenForm) -> Option<(String, String)> {
-    if let (Some(id), Some(secret)) = (&form.client_id, &form.client_secret) {
-        return Some((id.clone(), secret.clone()));
+fn client_credentials(
+    headers: &HeaderMap,
+    client_id: Option<&str>,
+    client_secret: Option<&str>,
+) -> Option<(String, String)> {
+    if let (Some(id), Some(secret)) = (client_id, client_secret) {
+        return Some((id.to_string(), secret.to_string()));
     }
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)?
