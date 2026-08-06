@@ -94,6 +94,16 @@ fn build_templates() -> Environment<'static> {
     )
     .unwrap();
     env.add_template(
+        "users.html",
+        include_str!("../templates/dashboard/users.html"),
+    )
+    .unwrap();
+    env.add_template(
+        "user_detail.html",
+        include_str!("../templates/dashboard/user_detail.html"),
+    )
+    .unwrap();
+    env.add_template(
         "clients.html",
         include_str!("../templates/dashboard/clients.html"),
     )

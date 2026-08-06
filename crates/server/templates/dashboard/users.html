@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Users · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Users</h1>
+<p class="muted small mb-lg">
+  End users who sign in to relying apps. Each user carries <strong>roles</strong>,
+  <strong>groups</strong> and <strong>custom attributes</strong> that are echoed
+  into their id/access tokens, so your apps can enforce per-user access.
+</p>
+
+{% if users %}
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Email</th><th>Roles</th><th>Groups</th><th></th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.email }}</td>
+        <td class="small">{{ u.roles|join(", ") if u.roles else "—" }}</td>
+        <td class="small">{{ u.groups|join(", ") if u.groups else "—" }}</td>
+        <td style="text-align:right">
+          <a class="btn btn-sm btn-secondary" href="/dashboard/users/{{ u.id }}">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel-muted">No end users yet. They appear here once they register via a login screen.</div>
+{% endif %}
+{% endblock %}

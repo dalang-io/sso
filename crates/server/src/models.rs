@@ -4,6 +4,7 @@
 //! and MySQL/MariaDB unchanged (see `db`).
 
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 /// An admin user of the dashboard (not an end-user of a downstream app).
 /// An isolated workspace that owns OAuth clients.
@@ -52,6 +53,11 @@ impl Admin {
     pub fn can_manage_members(&self) -> bool {
         self.is_super()
     }
+    /// Only super admins manage end users' fine-grained authorization
+    /// (roles/groups/attributes), mirroring members management.
+    pub fn can_manage_users(&self) -> bool {
+        self.is_super()
+    }
 
     /// Whether this member may act on a client owned by `tenant_id`.
     /// Super admins can act on any tenant; others only on their own.
@@ -65,6 +71,11 @@ pub const ASSIGNABLE_ROLES: [&str; 2] = ["manager", "developer"];
 
 /// An end user who authenticates to relying apps via this SSO. Distinct from
 /// [`Admin`], who only manages the dashboard.
+///
+/// `roles`, `groups` and `attributes` are the fine-grained authorization model
+/// (a lightweight Keycloak-style subset): they're stored per user and echoed
+/// into id/access tokens (see `Claims`) so relying parties can enforce per-user
+/// access without a database round-trip. An empty list/object means "none".
 #[derive(Clone, Debug, Serialize)]
 pub struct User {
     pub id: String,
@@ -72,6 +83,12 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub created_at: String,
+    /// Ream roles, e.g. `["admin", "billing"]`.
+    pub roles: Vec<String>,
+    /// Groups the user belongs to, e.g. `["engineering", "on-call"]`.
+    pub groups: Vec<String>,
+    /// Custom attributes, e.g. `{"department": "platform", "tier": "gold"}`.
+    pub attributes: BTreeMap<String, String>,
 }
 
 /// A registered OAuth 2.0 client — the equivalent of a "Google Cloud project

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Edit user · {{ brand_title }}{% endblock %}
+{% block content %}
+<div class="row between">
+  <h1>{{ user.email }}</h1>
+  <a class="btn btn-secondary btn-sm" href="/dashboard/users">← All users</a>
+</div>
+<p class="muted small mb-lg">
+  These are embedded into the user's id_token and access token (as <code>roles</code>,
+  <code>groups</code>, <code>attributes</code>). Apps that request the
+  <code>openid</code> scope receive them automatically.
+</p>
+
+<form method="post" action="/dashboard/users/{{ user.id }}/update" class="panel stack">
+  <div class="field">
+    <label class="label">Roles (one per line)</label>
+    <textarea class="input" name="roles" rows="4" placeholder="admin&#10;billing">{{ roles_text }}</textarea>
+    <p class="hint">e.g. <code>admin</code>, <code>billing</code> — echoed as <code>roles</code>.</p>
+  </div>
+  <div class="field">
+    <label class="label">Groups (one per line)</label>
+    <textarea class="input" name="groups" rows="4" placeholder="engineering&#10;on-call">{{ groups_text }}</textarea>
+    <p class="hint">e.g. <code>engineering</code>, <code>on-call</code> — echoed as <code>groups</code>.</p>
+  </div>
+  <div class="field">
+    <label class="label">Attributes (<code>key=value</code>, one per line)</label>
+    <textarea class="input" name="attributes" rows="5" placeholder="department=platform&#10;tier=gold">{{ attributes_text }}</textarea>
+    <p class="hint">Echoed as the <code>attributes</code> object in the token.</p>
+  </div>
+  <div><button class="btn btn-primary">Save</button></div>
+</form>
+{% endblock %}

@@ -270,6 +270,9 @@ mod tests {
             scope: "openid".into(),
             email: None,
             nonce: None,
+            roles: vec![],
+            groups: vec![],
+            attributes: serde_json::Map::new(),
         };
         let token = s.sign(&claims).unwrap();
         let verified = reloaded.verify(&token, "http://issuer.test").unwrap();

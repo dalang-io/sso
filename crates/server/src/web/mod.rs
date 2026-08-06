@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub mod clients;
+pub mod users;
 
 use crate::error::{AppError, AppResult};
 use crate::models::Admin;
@@ -47,6 +48,10 @@ pub fn router() -> Router<AppState> {
             get(admin::members_page).post(admin::create_member),
         )
         .route("/dashboard/members/:id/delete", post(admin::delete_member))
+        // super-admin: end-user fine-grained authorization
+        .route("/dashboard/users", get(users::list))
+        .route("/dashboard/users/:id", get(users::detail))
+        .route("/dashboard/users/:id/update", post(users::update))
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.

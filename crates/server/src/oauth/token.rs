@@ -212,6 +212,18 @@ async fn issue(
     let ttl = state.config.access_token_ttl.as_secs() as i64;
     let iss = state.config.issuer();
 
+    // Fine-grained authorization is echoed from the end user. For
+    // `client_credentials` (subject = client_id, no user) this is empty.
+    let user = state.db.user_by_email(subject).await?;
+    let (roles, groups, attributes) = match &user {
+        Some(u) => (
+            u.roles.clone(),
+            u.groups.clone(),
+            string_map_to_json(&u.attributes),
+        ),
+        None => (vec![], vec![], serde_json::Map::new()),
+    };
+
     let access = state
         .signer
         .sign(&Claims {
@@ -223,6 +235,9 @@ async fn issue(
             scope: scope.to_string(),
             email: None,
             nonce: None,
+            roles: roles.clone(),
+            groups: groups.clone(),
+            attributes: attributes.clone(),
         })
         .map_err(AppError::Other)?;
 
@@ -239,6 +254,9 @@ async fn issue(
                     scope: String::new(),
                     email: Some(subject.to_string()),
                     nonce: nonce.map(str::to_string),
+                    roles,
+                    groups,
+                    attributes,
                 })
                 .map_err(AppError::Other)?,
         )
@@ -301,4 +319,14 @@ fn expired(rfc3339: &str) -> bool {
         Ok(t) => t < chrono::Utc::now(),
         Err(_) => true,
     }
+}
+
+/// Convert a `BTreeMap<String, String>` attribute map into a JSON value map,
+/// so claims serialize as an object (`{"dept": "it"}`) rather than nested maps.
+fn string_map_to_json(
+    m: &std::collections::BTreeMap<String, String>,
+) -> serde_json::Map<String, serde_json::Value> {
+    m.iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+        .collect()
 }

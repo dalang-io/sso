@@ -18,10 +18,22 @@ pub async fn userinfo(
         .verify(&token, &state.config.issuer())
         .map_err(|_| AppError::oauth("invalid_token", "access token invalid or expired"))?;
 
-    Ok(Json(json!({
+    let mut body = json!({
         "sub": claims.sub,
         "email": claims.email.unwrap_or(claims.sub),
-    })))
+    });
+    // Echo fine-grained authorization embedded in the access token, so relying
+    // parties can enforce per-user access without this endpoint hitting the DB.
+    if !claims.roles.is_empty() {
+        body["roles"] = json!(claims.roles);
+    }
+    if !claims.groups.is_empty() {
+        body["groups"] = json!(claims.groups);
+    }
+    if !claims.attributes.is_empty() {
+        body["attributes"] = json!(claims.attributes);
+    }
+    Ok(Json(body))
 }
 
 fn bearer(headers: &HeaderMap) -> Option<String> {

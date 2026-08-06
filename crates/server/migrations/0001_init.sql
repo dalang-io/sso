@@ -29,7 +29,13 @@ CREATE TABLE IF NOT EXISTS users (
     id            VARCHAR(36)  PRIMARY KEY,
     email         VARCHAR(320) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    created_at    VARCHAR(40)  NOT NULL
+    created_at    VARCHAR(40)  NOT NULL,
+    -- Fine-grained authorization: roles, groups, and custom attributes echoed
+    -- into tokens (mirrors Keycloak's realm roles / groups / user attributes).
+    -- Stored as JSON TEXT (empty [] / {} = none), like clients.js_origins.
+    roles        TEXT NOT NULL DEFAULT '[]',
+    groups       TEXT NOT NULL DEFAULT '[]',
+    attributes   TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS clients (

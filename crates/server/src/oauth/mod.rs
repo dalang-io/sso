@@ -59,6 +59,13 @@ pub struct Claims {
     /// OIDC `nonce`, echoed into the id_token when the RP supplied one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
+    /// Fine-grained authorization, echoed from the end user (Keycloak-style).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub attributes: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Sign a claim set as an RS256 JWT with the active `kid` (classical backend).

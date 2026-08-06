@@ -90,6 +90,9 @@ impl Db {
             "ALTER TABLE auth_codes ADD COLUMN nonce VARCHAR(255)",
             "ALTER TABLE refresh_tokens ADD COLUMN family_id VARCHAR(64) NOT NULL DEFAULT ''",
             "ALTER TABLE refresh_tokens ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN roles TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE users ADD COLUMN groups TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE users ADD COLUMN attributes TEXT NOT NULL DEFAULT '{}'",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -249,7 +252,12 @@ impl Db {
             email: email.to_string(),
             password_hash: crypto::hash_secret(password)?,
             created_at: chrono::Utc::now().to_rfc3339(),
+            roles: vec![],
+            groups: vec![],
+            attributes: std::collections::BTreeMap::new(),
         };
+        // `roles/groups/attributes` default to '[]'/'{}' via the schema; a fresh
+        // account has no fine-grained authorization until an admin assigns it.
         let sql =
             self.q("INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)");
         sqlx::query(&sql)
@@ -278,6 +286,34 @@ impl Db {
             .fetch_optional(&self.pool)
             .await?;
         Ok(row.map(|r| row_to_user(&r)))
+    }
+
+    /// List all end users, newest first (super-admin view).
+    pub async fn list_users(&self) -> anyhow::Result<Vec<User>> {
+        let rows = sqlx::query("SELECT * FROM users ORDER BY created_at DESC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_user).collect())
+    }
+
+    /// Update a user's fine-grained authorization (roles, groups, attributes).
+    /// Returns `false` if no user with `id` exists.
+    pub async fn update_user(
+        &self,
+        id: &str,
+        roles: &[String],
+        groups: &[String],
+        attributes: &std::collections::BTreeMap<String, String>,
+    ) -> anyhow::Result<bool> {
+        let sql = self.q("UPDATE users SET roles = ?, groups = ?, attributes = ? WHERE id = ?");
+        let res = sqlx::query(&sql)
+            .bind(serde_json::to_string(roles)?)
+            .bind(serde_json::to_string(groups)?)
+            .bind(serde_json::to_string(attributes)?)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
     }
 
     // ---- clients -----------------------------------------------------------
@@ -611,7 +647,36 @@ fn row_to_user(r: &AnyRow) -> User {
         email: r.get("email"),
         password_hash: r.get("password_hash"),
         created_at: r.get("created_at"),
+        // JSON TEXT columns; tolerate malformed/absent values (default = none).
+        roles: json_array(r, "roles"),
+        groups: json_array(r, "groups"),
+        attributes: json_object(r, "attributes"),
     }
+}
+
+/// Parse a JSON-array TEXT column into a `Vec<String>`; empty on failure.
+fn json_array(r: &AnyRow, col: &str) -> Vec<String> {
+    r.try_get::<String, _>(col)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+/// Parse a JSON-object TEXT column into `BTreeMap<String, String>`; empty on
+/// failure. Values are coerced to strings (non-string values are dropped).
+fn json_object(r: &AnyRow, col: &str) -> std::collections::BTreeMap<String, String> {
+    let raw: Option<String> = r.try_get::<String, _>(col).ok();
+    let Some(map) = raw.and_then(|s| serde_json::from_str::<serde_json::Map<_, _>>(&s).ok()) else {
+        return std::collections::BTreeMap::new();
+    };
+    map.into_iter()
+        .filter_map(|(k, v)| match v {
+            serde_json::Value::String(s) => Some((k, s)),
+            serde_json::Value::Bool(b) => Some((k, b.to_string())),
+            serde_json::Value::Number(n) => Some((k, n.to_string())),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Extract the on-disk path from a `sqlite://…` URL so we can pre-create its dir.
