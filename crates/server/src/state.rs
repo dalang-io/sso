@@ -133,5 +133,10 @@ fn build_templates() -> Environment<'static> {
         include_str!("../templates/oauth/login.html"),
     )
     .unwrap();
+    env.add_template(
+        "account.html",
+        include_str!("../templates/oauth/account.html"),
+    )
+    .unwrap();
     env
 }

@@ -337,6 +337,18 @@ impl Db {
         Ok(res.rows_affected() > 0)
     }
 
+    /// Update a user's password (plaintext is hashed before storage).
+    pub async fn update_user_password(&self, id: &str, new_password: &str) -> anyhow::Result<()> {
+        let hash = crypto::hash_secret(new_password)?;
+        let sql = self.q("UPDATE users SET password_hash = ? WHERE id = ?");
+        sqlx::query(&sql)
+            .bind(&hash)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     // ---- clients -----------------------------------------------------------
 
     pub async fn list_clients(&self) -> anyhow::Result<Vec<Client>> {

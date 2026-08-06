@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Account · {{ brand_title }}{% endblock %}
+{% block content %}
+<div class="container-sm">
+  <div class="row between">
+    <h1>Your account</h1>
+    <form method="get" action="/oauth/logout"><button class="btn btn-secondary btn-sm">Sign out</button></form>
+  </div>
+  <p class="muted small">Signed in as <strong>{{ email }}</strong></p>
+
+  {% if error %}<div class="alert alert-danger mb">{{ error }}</div>{% endif %}
+  {% if msg %}<div class="alert alert-success mb">{{ msg }}</div>{% endif %}
+
+  <div class="panel mb-lg">
+    <h2>Two-factor authentication</h2>
+
+    {% if pending_secret %}
+    <p class="hint mb">
+      Scan the QR below (or enter the setup key) in your authenticator app, then
+      enter the 6-digit code it shows to <strong>activate</strong> 2FA. Nothing is
+      saved until you verify.
+    </p>
+    {% if pending_qr %}<img src="{{ pending_qr }}" alt="TOTP QR code" width="180" height="180" class="mb" style="background:#fff;padding:8px;border-radius:6px" />{% endif %}
+    <div class="field">
+      <label class="label">Setup key</label>
+      <div class="mono">{{ pending_secret }}</div>
+    </div>
+    <form method="post" action="/account/totp/verify" class="stack mt">
+      <input type="hidden" name="secret" value="{{ pending_secret }}" />
+      <div class="field">
+        <label class="label">Verification code</label>
+        <input class="input" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required placeholder="123456" autocomplete="one-time-code" />
+      </div>
+      <div class="row">
+        <button class="btn btn-primary">Activate 2FA</button>
+        <a class="btn btn-secondary" href="/account">Cancel</a>
+      </div>
+    </form>
+
+    {% elif totp_enabled %}
+    <p class="hint mb">Two-factor authentication is <strong>enabled</strong>. You'll be asked for a code at sign-in.</p>
+    {% if totp_qr %}<img src="{{ totp_qr }}" alt="TOTP QR code" width="150" height="150" class="mb" style="background:#fff;padding:6px;border-radius:6px" />{% endif %}
+    <div class="field">
+      <label class="label">Setup key</label>
+      <div class="mono">{{ totp_secret }}</div>
+    </div>
+    <p class="hint mb">To disable 2FA, enter your current authenticator code:</p>
+    <form method="post" action="/account/totp/disable" class="stack">
+      <div class="field">
+        <label class="label">Your current code</label>
+        <input class="input" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required placeholder="123456" autocomplete="one-time-code" />
+      </div>
+      <div><button class="btn btn-danger">Disable 2FA</button></div>
+    </form>
+
+    {% else %}
+    <p class="hint" style="margin:0">Two-factor authentication is <strong>not enabled</strong>. Adding it makes your account much harder to compromise.</p>
+    <form method="post" action="/account/totp" class="mt">
+      <button class="btn btn-primary">Set up two-factor authentication</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Change password</h2>
+    <form method="post" action="/account/password" class="stack">
+      <div class="field">
+        <label class="label">Current password</label>
+        <input class="input" name="current" type="password" required autocomplete="current-password" />
+      </div>
+      <div class="field">
+        <label class="label">New password</label>
+        <input class="input" name="new_password" type="password" required placeholder="At least 8 characters" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label class="label">Confirm new password</label>
+        <input class="input" name="confirm" type="password" required autocomplete="new-password" />
+      </div>
+      <div><button class="btn btn-primary">Update password</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

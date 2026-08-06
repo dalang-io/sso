@@ -4,6 +4,7 @@
 //! client-credentials grants, plus OIDC discovery, JWKS and UserInfo. Access
 //! and id tokens are stateless RS256 JWTs; only refresh tokens hit the DB.
 
+pub mod account;
 pub mod authorize;
 pub mod enduser;
 pub mod introspect;
@@ -35,6 +36,12 @@ pub fn browser_router() -> Router<AppState> {
         .route("/oauth/login", post(enduser::login))
         .route("/oauth/register", post(enduser::register))
         .route("/oauth/logout", get(enduser::logout))
+        // End-user self-service (signed-in end user).
+        .route("/account", get(account::page))
+        .route("/account/totp", post(account::enable_totp))
+        .route("/account/totp/verify", post(account::verify_totp))
+        .route("/account/totp/disable", post(account::disable_totp))
+        .route("/account/password", post(account::change_password))
 }
 
 /// Machine-to-machine OAuth routes (token exchange, userinfo). No cookies, so
