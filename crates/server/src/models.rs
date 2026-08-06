@@ -89,6 +89,15 @@ pub struct User {
     pub groups: Vec<String>,
     /// Custom attributes, e.g. `{"department": "platform", "tier": "gold"}`.
     pub attributes: BTreeMap<String, String>,
+    /// Base32 TOTP secret for two-factor auth; `None` = 2FA not enrolled.
+    pub totp_secret: Option<String>,
+}
+
+impl User {
+    /// Whether two-factor authentication is enrolled for this user.
+    pub fn totp_enabled(&self) -> bool {
+        self.totp_secret.as_deref().is_some_and(|s| !s.is_empty())
+    }
 }
 
 /// A registered OAuth 2.0 client — the equivalent of a "Google Cloud project
@@ -124,6 +133,9 @@ pub struct Client {
     pub resources: Vec<ClientResource>,
     /// Who may access which resources, keyed on the user's roles/groups.
     pub policies: Vec<Policy>,
+    /// When true, every end user signing in to this client must have (and use)
+    /// two-factor authentication.
+    pub require_mfa: bool,
     pub created_at: String,
 }
 
@@ -369,6 +381,7 @@ mod tests {
                     groups: vec![],
                 },
             ],
+            require_mfa: false,
             created_at: "".into(),
         }
     }

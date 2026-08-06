@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- Stored as JSON TEXT (empty [] / {} = none), like clients.js_origins.
     roles        TEXT NOT NULL DEFAULT '[]',
     groups       TEXT NOT NULL DEFAULT '[]',
-    attributes   TEXT NOT NULL DEFAULT '{}'
+    attributes   TEXT NOT NULL DEFAULT '{}',
+    -- Base32 TOTP secret; NULL = two-factor authentication not enrolled.
+    totp_secret  VARCHAR(64)
 );
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -62,6 +64,8 @@ CREATE TABLE IF NOT EXISTS clients (
     resources          TEXT         NOT NULL DEFAULT '[]',
     -- JSON array of policies: [{name, resources:[...], roles:[...], groups:[...]}].
     policies           TEXT         NOT NULL DEFAULT '[]',
+    -- Require every signing-in end user to have (and use) TOTP 2FA.
+    require_mfa        INTEGER      NOT NULL DEFAULT 0,
     created_at         VARCHAR(40)  NOT NULL
 );
 

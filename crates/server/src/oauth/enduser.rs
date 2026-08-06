@@ -6,7 +6,9 @@
 //! *inside* the authorization flow: they authenticate the user, then hand back
 //! to the consent screen carrying the original OAuth request via [`AuthzParams`].
 
-use super::authorize::{render_consent, render_login, validate, AuthzParams};
+use super::authorize::{
+    render_consent, render_login, render_mfa_login, validate, AuthzParams, MfaStep,
+};
 use crate::error::AppResult;
 use crate::models::User;
 use crate::security;
@@ -44,6 +46,9 @@ pub struct CredsForm {
     pub params: AuthzParams,
     pub email: String,
     pub password: String,
+    /// Present on the two-factor step: the TOTP code.
+    #[serde(default)]
+    pub mfa_code: String,
 }
 
 /// POST /oauth/login — authenticate an existing end user, then show consent.
@@ -64,27 +69,78 @@ pub async fn login(
             .into_response());
     }
 
-    let user = state.db.user_by_email(f.email.trim()).await?;
-    match user {
-        Some(u) if crate::crypto::verify_secret(&f.password, &u.password_hash) => {
-            // Legit login — reset any earlier-failure budget for this account.
-            state.rate_limiter.clear(&format!("acct:{}", u.email));
-            // Authenticated — now check this client's email allow-list.
-            if !client.email_allowed(&u.email) {
-                let msg = super::authorize::email_denied_msg(&u.email, &client);
-                return Ok(render_login(&state, &client, &f.params, Some(&msg))?.into_response());
-            }
-            let jar = jar.add(session_cookie(u.id, state.config.cookie_secure));
-            Ok((jar, render_consent(&state, &client, &f.params, &u.email)?).into_response())
-        }
-        _ => Ok(render_login(
+    let Some(user) = state.db.user_by_email(f.email.trim()).await? else {
+        return Ok(render_login(
             &state,
             &client,
             &f.params,
             Some("Invalid email or password"),
         )?
-        .into_response()),
+        .into_response());
+    };
+    if !crate::crypto::verify_secret(&f.password, &user.password_hash) {
+        return Ok(render_login(
+            &state,
+            &client,
+            &f.params,
+            Some("Invalid email or password"),
+        )?
+        .into_response());
     }
+
+    // Password OK. Two-factor policy:
+    //   1. Client requires MFA but the user has none -> deny.
+    //   2. User has TOTP enrolled -> require a valid code before a session.
+    if client.require_mfa && !user.totp_enabled() {
+        return Ok(render_login(
+            &state,
+            &client,
+            &f.params,
+            Some(
+                "This app requires two-factor authentication, but your account \
+                 doesn't have it configured. Contact an administrator.",
+            ),
+        )?
+        .into_response());
+    }
+    if user.totp_enabled() {
+        let code = f.mfa_code.trim();
+        let valid = !code.is_empty()
+            && crate::crypto::verify_totp(user.totp_secret.as_deref().unwrap_or_default(), code);
+        if !valid {
+            let err = if code.is_empty() {
+                None
+            } else {
+                Some("Invalid verification code — try again.".to_string())
+            };
+            return Ok(render_mfa_login(
+                &state,
+                &client,
+                &f.params,
+                MfaStep {
+                    email: user.email.clone(),
+                    password: f.password.clone(),
+                    error: err,
+                },
+            )?
+            .into_response());
+        }
+    }
+
+    // Fully authenticated (password + MFA satisfied) — reset the lockout budget.
+    state.rate_limiter.clear(&format!("acct:{}", user.email));
+
+    // Now check this client's email allow-list.
+    if !client.email_allowed(&user.email) {
+        let msg = super::authorize::email_denied_msg(&user.email, &client);
+        return Ok(render_login(&state, &client, &f.params, Some(&msg))?.into_response());
+    }
+    let jar = jar.add(session_cookie(user.id, state.config.cookie_secure));
+    Ok((
+        jar,
+        render_consent(&state, &client, &f.params, &user.email)?,
+    )
+        .into_response())
 }
 
 /// POST /oauth/register — create an end user, then show consent.
@@ -104,6 +160,21 @@ pub async fn register(
             "Too many attempts. Please try again later.",
         )
             .into_response());
+    }
+
+    // New accounts can't satisfy a mandatory-2FA client until an admin enrolls
+    // them, so refuse to create one that would be locked out.
+    if client.require_mfa {
+        return Ok(render_login(
+            &state,
+            &client,
+            &f.params,
+            Some(
+                "This app requires two-factor authentication. Ask an administrator \
+                 to create your account and set up 2FA.",
+            ),
+        )?
+        .into_response());
     }
 
     let err: Option<String> = if !email.contains('@') {

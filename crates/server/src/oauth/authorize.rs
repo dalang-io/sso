@@ -91,6 +91,16 @@ pub(super) async fn validate(state: &AppState, p: &AuthzParams) -> AppResult<Cli
     Ok(client)
 }
 
+/// State for the two-factor (TOTP) step of end-user login.
+#[derive(Serialize)]
+pub struct MfaStep {
+    /// End-user email (& password) carried across the step so they needn't retype.
+    pub email: String,
+    pub password: String,
+    /// Message shown with the code prompt (e.g. "Invalid code").
+    pub error: Option<String>,
+}
+
 /// Render the end-user login/registration screen, preserving the OAuth request.
 pub(super) fn render_login(
     state: &AppState,
@@ -104,6 +114,26 @@ pub(super) fn render_login(
             client_name => client.name,
             params => p.to_map(),
             error => error,
+            mfa => None::<MfaStep>,
+        },
+    )?;
+    Ok(Html(body))
+}
+
+/// Render the two-factor step of the login screen.
+pub(super) fn render_mfa_login(
+    state: &AppState,
+    client: &Client,
+    p: &AuthzParams,
+    mfa: MfaStep,
+) -> AppResult<Html<String>> {
+    let body = state.render(
+        "oauth_login.html",
+        context! {
+            client_name => client.name,
+            params => p.to_map(),
+            error => None::<&str>,
+            mfa => Some(mfa),
         },
     )?;
     Ok(Html(body))

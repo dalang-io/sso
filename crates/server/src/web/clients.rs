@@ -134,6 +134,7 @@ pub async fn create(
         enable_authorization: false,
         resources: vec![],
         policies: vec![],
+        require_mfa: false,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
@@ -294,6 +295,7 @@ pub struct AuthzForm {
     enable: Option<String>,
     resources: String,
     policies: String,
+    require_mfa: Option<String>,
 }
 
 /// POST /dashboard/clients/:id/authz — save resources + policies (line-based).
@@ -320,6 +322,10 @@ pub async fn update_authz(
     state
         .db
         .update_client_authz(&id, enable, &resources, &policies)
+        .await?;
+    state
+        .db
+        .update_client_mfa(&id, form.require_mfa.is_some())
         .await?;
     Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
 }

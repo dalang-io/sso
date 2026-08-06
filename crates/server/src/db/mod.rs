@@ -99,6 +99,8 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN enable_authorization INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE clients ADD COLUMN resources TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE clients ADD COLUMN policies TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE clients ADD COLUMN require_mfa INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -261,6 +263,7 @@ impl Db {
             roles: vec![],
             groups: vec![],
             attributes: std::collections::BTreeMap::new(),
+            totp_secret: None,
         };
         // `roles/groups/attributes` default to '[]'/'{}' via the schema; a fresh
         // account has no fine-grained authorization until an admin assigns it.
@@ -322,6 +325,18 @@ impl Db {
         Ok(res.rows_affected() > 0)
     }
 
+    /// Enable (`Some(secret)`) or disable (`None`) a user's TOTP enrollment.
+    /// Returns `false` if no user with `id` exists.
+    pub async fn update_user_totp(&self, id: &str, secret: Option<&str>) -> anyhow::Result<bool> {
+        let sql = self.q("UPDATE users SET totp_secret = ? WHERE id = ?");
+        let res = sqlx::query(&sql)
+            .bind(secret)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
     // ---- clients -----------------------------------------------------------
 
     pub async fn list_clients(&self) -> anyhow::Result<Vec<Client>> {
@@ -354,8 +369,8 @@ impl Db {
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
              (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, \
-              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, require_mfa, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -371,6 +386,7 @@ impl Db {
             .bind(client.enable_authorization as i32)
             .bind(serde_json::to_string(&client.resources)?)
             .bind(serde_json::to_string(&client.policies)?)
+            .bind(client.require_mfa as i32)
             .bind(&client.created_at)
             .execute(&self.pool)
             .await?;
@@ -402,6 +418,17 @@ impl Db {
             .bind(enable as i32)
             .bind(serde_json::to_string(resources)?)
             .bind(serde_json::to_string(policies)?)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Toggle whether a client requires two-factor authentication for its users.
+    pub async fn update_client_mfa(&self, id: &str, require_mfa: bool) -> anyhow::Result<()> {
+        let sql = self.q("UPDATE clients SET require_mfa = ? WHERE id = ?");
+        sqlx::query(&sql)
+            .bind(require_mfa as i32)
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -655,6 +682,7 @@ fn row_to_client(r: &AnyRow) -> Client {
         enable_authorization: r.try_get("enable_authorization").unwrap_or(0) != 0,
         resources: serde_json::from_str(&resources).unwrap_or_default(),
         policies: serde_json::from_str(&policies).unwrap_or_default(),
+        require_mfa: r.try_get("require_mfa").unwrap_or(0) != 0,
         created_at: r.get("created_at"),
     }
 }
@@ -698,6 +726,7 @@ fn row_to_user(r: &AnyRow) -> User {
         roles: json_array(r, "roles"),
         groups: json_array(r, "groups"),
         attributes: json_object(r, "attributes"),
+        totp_secret: r.try_get("totp_secret").ok(),
     }
 }
 

@@ -53,6 +53,11 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/users", get(users::list))
         .route("/dashboard/users/:id", get(users::detail))
         .route("/dashboard/users/:id/update", post(users::update))
+        .route("/dashboard/users/:id/totp/enable", post(users::enable_totp))
+        .route(
+            "/dashboard/users/:id/totp/disable",
+            post(users::disable_totp),
+        )
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.

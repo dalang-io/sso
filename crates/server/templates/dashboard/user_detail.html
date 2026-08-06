@@ -29,4 +29,41 @@
   </div>
   <div><button class="btn btn-primary">Save</button></div>
 </form>
+
+<div class="panel mt">
+  <div class="row between mb">
+    <h2 style="margin:0">Two-factor authentication</h2>
+    {% if totp_enabled %}
+    <form method="post" action="/dashboard/users/{{ user.id }}/totp/disable"
+          data-confirm="Disable 2FA for {{ user.email }}? Their future sign-ins won't require a code.">
+      <button class="btn btn-sm btn-danger">Disable 2FA</button>
+    </form>
+    {% else %}
+    <form method="post" action="/dashboard/users/{{ user.id }}/totp/enable">
+      <button class="btn btn-sm btn-primary">Enable 2FA</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if totp_enabled %}
+  <p class="hint mb">
+    This user must enter a 6-digit code from an authenticator app at sign-in.
+    Scan the QR (or enter the setup key) in Google Authenticator, 1Password,
+    Authy, etc.
+  </p>
+  {% if totp_qr %}
+  <img src="{{ totp_qr }}" alt="TOTP QR code" width="180" height="180" class="mb" style="background:#fff;padding:8px;border-radius:6px" />
+  {% endif %}
+  <div class="field">
+    <label class="label">Setup key</label>
+    <div class="mono">{{ totp_secret }}</div>
+  </div>
+  <div class="field">
+    <label class="label">otpauth URI</label>
+    <div class="mono small break">{{ totp_uri }}</div>
+  </div>
+  {% else %}
+  <p class="hint" style="margin:0">No authenticator configured. Enable 2FA to require a one-time code at this user's sign-in.</p>
+  {% endif %}
+</div>
 {% endblock %}

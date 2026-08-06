@@ -120,6 +120,10 @@
     <input type="checkbox" name="enable" value="1" {% if client.enable_authorization %}checked{% endif %} />
     Enable resource-based authorization (RPT in access token)
   </label>
+  <label class="check mb">
+    <input type="checkbox" name="require_mfa" value="1" {% if client.require_mfa %}checked{% endif %} />
+    Require two-factor authentication for this client's users
+  </label>
   <div class="field">
     <label class="label">Resources</label>
     <p class="hint">One per line: <code>name scope scope …</code>. e.g. <code>invoices read write</code></p>

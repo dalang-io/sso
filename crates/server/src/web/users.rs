@@ -10,6 +10,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::Form;
 use axum_extra::extract::cookie::SignedCookieJar;
+use base64::Engine;
 use minijinja::context;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -51,6 +52,34 @@ pub async fn detail(
 ) -> AppResult<Html<String>> {
     let admin = require_super(&state, &jar).await?;
     let user = user_in_scope(&state, &id).await?;
+
+    // TOTP provisioning material (secret + QR), shown whenever enrolled so an
+    // admin can re-scan or hand the setup key to the user.
+    let (totp_secret, totp_uri, totp_qr) = match &user.totp_secret {
+        Some(secret) if !secret.is_empty() => {
+            let uri = crate::crypto::totp_provisioning_uri(
+                &state.config.brand_title,
+                &user.email,
+                secret,
+            );
+            let qr = qrcode::QrCode::new(uri.clone())
+                .ok()
+                .map(|code| {
+                    code.render::<qrcode::render::svg::Color>()
+                        .min_dimensions(4, 4)
+                        .build()
+                })
+                .map(|svg| {
+                    format!(
+                        "data:image/svg+xml;base64,{}",
+                        base64::engine::general_purpose::STANDARD.encode(svg)
+                    )
+                });
+            (secret.clone(), uri, qr)
+        }
+        _ => (String::new(), String::new(), None),
+    };
+
     let body = state.render(
         "user_detail.html",
         context! {
@@ -60,9 +89,40 @@ pub async fn detail(
             roles_text => user.roles.join("\n"),
             groups_text => user.groups.join("\n"),
             attributes_text => attributes_to_text(&user.attributes),
+            totp_enabled => user.totp_enabled(),
+            totp_secret => totp_secret,
+            totp_uri => totp_uri,
+            totp_qr => totp_qr,
         },
     )?;
     Ok(Html(body))
+}
+
+/// POST /dashboard/users/:id/totp/enable — generate + store a TOTP secret.
+pub async fn enable_totp(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    let secret = crate::crypto::generate_totp_secret();
+    state.db.update_user_totp(&id, Some(&secret)).await?;
+    tracing::info!(user = %user.email, "TOTP enrolled by admin");
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
+}
+
+/// POST /dashboard/users/:id/totp/disable — remove the TOTP secret.
+pub async fn disable_totp(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    state.db.update_user_totp(&id, None).await?;
+    tracing::warn!(user = %user.email, "TOTP disabled by admin");
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
 }
 
 #[derive(Deserialize)]
