@@ -93,6 +93,9 @@ impl Db {
             "ALTER TABLE users ADD COLUMN roles TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE users ADD COLUMN groups TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE users ADD COLUMN attributes TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE clients ADD COLUMN include_roles INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE clients ADD COLUMN include_groups INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE clients ADD COLUMN include_attributes INTEGER NOT NULL DEFAULT 1",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -347,8 +350,9 @@ impl Db {
         // `client_secret_hash` is a legacy NOT NULL column kept for schema
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
-             (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+             (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, \
+              include_roles, include_groups, include_attributes, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -358,6 +362,9 @@ impl Db {
             .bind(serde_json::to_string(&client.js_origins)?)
             .bind(serde_json::to_string(&client.redirect_uris)?)
             .bind(serde_json::to_string(&client.allowed_emails)?)
+            .bind(client.include_roles as i32)
+            .bind(client.include_groups as i32)
+            .bind(client.include_attributes as i32)
             .bind(&client.created_at)
             .execute(&self.pool)
             .await?;
@@ -450,14 +457,19 @@ impl Db {
         js_origins: &[String],
         redirect_uris: &[String],
         allowed_emails: &[String],
+        claims: &crate::models::ClientClaims,
     ) -> anyhow::Result<()> {
         let sql = self.q(
-            "UPDATE clients SET js_origins = ?, redirect_uris = ?, allowed_emails = ? WHERE id = ?",
+            "UPDATE clients SET js_origins = ?, redirect_uris = ?, allowed_emails = ?, \
+             include_roles = ?, include_groups = ?, include_attributes = ? WHERE id = ?",
         );
         sqlx::query(&sql)
             .bind(serde_json::to_string(js_origins)?)
             .bind(serde_json::to_string(redirect_uris)?)
             .bind(serde_json::to_string(allowed_emails)?)
+            .bind(claims.include_roles as i32)
+            .bind(claims.include_groups as i32)
+            .bind(claims.include_attributes as i32)
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -608,6 +620,9 @@ fn row_to_client(r: &AnyRow) -> Client {
         js_origins: serde_json::from_str(&js).unwrap_or_default(),
         redirect_uris: serde_json::from_str(&uris).unwrap_or_default(),
         allowed_emails: serde_json::from_str(&emails).unwrap_or_default(),
+        include_roles: r.try_get("include_roles").unwrap_or(1) != 0,
+        include_groups: r.try_get("include_groups").unwrap_or(1) != 0,
+        include_attributes: r.try_get("include_attributes").unwrap_or(1) != 0,
         created_at: r.get("created_at"),
     }
 }

@@ -109,6 +109,12 @@ pub struct Client {
     /// `@domain` / `*@domain` (any address at that domain) or `user@domain`
     /// (one exact address). **Empty means allow all** (see the dashboard warning).
     pub allowed_emails: Vec<String>,
+    /// Per-client claim mapping: which fine-grained user claims this client's
+    /// tokens carry (all default to true). Lets a client omit roles/groups/
+    /// attributes it doesn't need. Enforced at token issuance.
+    pub include_roles: bool,
+    pub include_groups: bool,
+    pub include_attributes: bool,
     pub created_at: String,
 }
 
@@ -136,6 +142,14 @@ pub struct ClientSecret {
     #[serde(skip_serializing)]
     pub secret_hash: String,
     pub created_at: String,
+}
+
+/// Fine-grained claim mapping for a client: which user claims its tokens carry.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ClientClaims {
+    pub include_roles: bool,
+    pub include_groups: bool,
+    pub include_attributes: bool,
 }
 
 /// Match an email against a list of patterns (`@domain`, `*@domain`, or an exact

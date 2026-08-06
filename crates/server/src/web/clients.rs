@@ -128,6 +128,9 @@ pub async fn create(
         js_origins: vec![],
         redirect_uris: vec![],
         allowed_emails: vec![],
+        include_roles: true,
+        include_groups: true,
+        include_attributes: true,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
@@ -183,6 +186,9 @@ pub struct UrisForm {
     js_origins: String,
     redirect_uris: String,
     allowed_emails: String,
+    include_roles: Option<String>,
+    include_groups: Option<String>,
+    include_attributes: Option<String>,
 }
 
 pub async fn update_uris(
@@ -199,9 +205,15 @@ pub async fn update_uris(
     let js = parse_lines(&form.js_origins);
     let uris = parse_lines(&form.redirect_uris);
     let emails = parse_lines(&form.allowed_emails);
+    // Checkboxes send their value only when checked; absent => false.
+    let claims = crate::models::ClientClaims {
+        include_roles: form.include_roles.is_some(),
+        include_groups: form.include_groups.is_some(),
+        include_attributes: form.include_attributes.is_some(),
+    };
     state
         .db
-        .update_client_config(&id, &js, &uris, &emails)
+        .update_client_config(&id, &js, &uris, &emails, &claims)
         .await?;
     Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
 }

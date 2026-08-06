@@ -212,14 +212,27 @@ async fn issue(
     let ttl = state.config.access_token_ttl.as_secs() as i64;
     let iss = state.config.issuer();
 
-    // Fine-grained authorization is echoed from the end user. For
-    // `client_credentials` (subject = client_id, no user) this is empty.
+    // Fine-grained authorization is echoed from the end user, gated by the
+    // client's per-claim mapping (which claims this client wants). For
+    // `client_credentials` (subject = client_id, no user) these are empty.
     let user = state.db.user_by_email(subject).await?;
     let (roles, groups, attributes) = match &user {
         Some(u) => (
-            u.roles.clone(),
-            u.groups.clone(),
-            string_map_to_json(&u.attributes),
+            if client.include_roles {
+                u.roles.clone()
+            } else {
+                vec![]
+            },
+            if client.include_groups {
+                u.groups.clone()
+            } else {
+                vec![]
+            },
+            if client.include_attributes {
+                string_map_to_json(&u.attributes)
+            } else {
+                serde_json::Map::new()
+            },
         ),
         None => (vec![], vec![], serde_json::Map::new()),
     };

@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS clients (
     redirect_uris      TEXT         NOT NULL,
     -- JSON array of allowed email patterns; empty ([]) means allow all.
     allowed_emails     TEXT         NOT NULL DEFAULT '[]',
+    -- Which fine-grained user claims this client's tokens should carry
+    -- (0/1 INTEGER, default all on). Lets a client opt out of roles/groups/
+    -- attributes it doesn't need, mirroring Keycloak's client claim mapping.
+    include_roles      INTEGER      NOT NULL DEFAULT 1,
+    include_groups     INTEGER      NOT NULL DEFAULT 1,
+    include_attributes INTEGER      NOT NULL DEFAULT 1,
     created_at         VARCHAR(40)  NOT NULL
 );
 

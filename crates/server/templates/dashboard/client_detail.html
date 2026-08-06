@@ -83,6 +83,26 @@
     <textarea class="textarea" name="allowed_emails" rows="4"
       placeholder="@dalang.io&#10;*@intern.dalang.io&#10;someone@example.com">{{ allowed_emails_text }}</textarea>
   </div>
+  <div class="field">
+    <label class="label">Fine-grained claims to include in this client's tokens</label>
+    <p class="hint">
+      Which authorization claims (roles, groups, custom attributes on the end
+      user) are embedded in the id/access tokens this client receives. Untick
+      any this client doesn't need to keep tokens small.
+    </p>
+    <label class="check">
+      <input type="checkbox" name="include_roles" value="1" {% if client.include_roles %}checked{% endif %} />
+      Roles
+    </label>
+    <label class="check">
+      <input type="checkbox" name="include_groups" value="1" {% if client.include_groups %}checked{% endif %} />
+      Groups
+    </label>
+    <label class="check">
+      <input type="checkbox" name="include_attributes" value="1" {% if client.include_attributes %}checked{% endif %} />
+      Attributes
+    </label>
+  </div>
   <div class="row between">
     <button class="btn btn-primary">Save</button>
   </div>
