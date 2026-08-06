@@ -96,6 +96,9 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN include_roles INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE clients ADD COLUMN include_groups INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE clients ADD COLUMN include_attributes INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE clients ADD COLUMN enable_authorization INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE clients ADD COLUMN resources TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE clients ADD COLUMN policies TEXT NOT NULL DEFAULT '[]'",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -351,8 +354,8 @@ impl Db {
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
              (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, \
-              include_roles, include_groups, include_attributes, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -365,6 +368,9 @@ impl Db {
             .bind(client.include_roles as i32)
             .bind(client.include_groups as i32)
             .bind(client.include_attributes as i32)
+            .bind(client.enable_authorization as i32)
+            .bind(serde_json::to_string(&client.resources)?)
+            .bind(serde_json::to_string(&client.policies)?)
             .bind(&client.created_at)
             .execute(&self.pool)
             .await?;
@@ -379,6 +385,27 @@ impl Db {
             .fetch_all(&self.pool)
             .await?;
         Ok(rows.iter().map(row_to_client).collect())
+    }
+
+    /// Update a client's resource-based authorization config.
+    pub async fn update_client_authz(
+        &self,
+        id: &str,
+        enable: bool,
+        resources: &[crate::models::ClientResource],
+        policies: &[crate::models::Policy],
+    ) -> anyhow::Result<()> {
+        let sql = self.q(
+            "UPDATE clients SET enable_authorization = ?, resources = ?, policies = ? WHERE id = ?",
+        );
+        sqlx::query(&sql)
+            .bind(enable as i32)
+            .bind(serde_json::to_string(resources)?)
+            .bind(serde_json::to_string(policies)?)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     // ---- client secrets ----------------------------------------------------
@@ -612,6 +639,8 @@ fn row_to_client(r: &AnyRow) -> Client {
     let uris: String = r.get("redirect_uris");
     // `try_get` so a pre-migration row without the column reads as allow-all.
     let emails: String = r.try_get("allowed_emails").unwrap_or_else(|_| "[]".into());
+    let resources: String = r.try_get("resources").unwrap_or_else(|_| "[]".into());
+    let policies: String = r.try_get("policies").unwrap_or_else(|_| "[]".into());
     Client {
         id: r.get("id"),
         client_id: r.get("client_id"),
@@ -623,6 +652,9 @@ fn row_to_client(r: &AnyRow) -> Client {
         include_roles: r.try_get("include_roles").unwrap_or(1) != 0,
         include_groups: r.try_get("include_groups").unwrap_or(1) != 0,
         include_attributes: r.try_get("include_attributes").unwrap_or(1) != 0,
+        enable_authorization: r.try_get("enable_authorization").unwrap_or(0) != 0,
+        resources: serde_json::from_str(&resources).unwrap_or_default(),
+        policies: serde_json::from_str(&policies).unwrap_or_default(),
         created_at: r.get("created_at"),
     }
 }

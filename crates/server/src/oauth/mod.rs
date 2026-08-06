@@ -66,6 +66,10 @@ pub struct Claims {
     pub groups: Vec<String>,
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub attributes: serde_json::Map<String, serde_json::Value>,
+    /// RPT-style `authorization` grant (resource-based authorization), present
+    /// only on access tokens when the client has it enabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<serde_json::Value>,
 }
 
 /// Sign a claim set as an RS256 JWT with the active `kid` (classical backend).

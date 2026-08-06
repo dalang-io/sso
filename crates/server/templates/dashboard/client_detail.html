@@ -108,6 +108,38 @@
   </div>
 </form>
 
+<!-- Resource-based authorization: separate form (Keycloak-style), own save. -->
+<form method="post" action="/dashboard/clients/{{ client.id }}/authz" class="panel mt">
+  <h2>Authorization (fine-grained access)</h2>
+  <p class="hint mb">
+    When enabled, this client's access token carries an <code>authorization</code>
+    claim listing which of your resources the signed-in user may access, based on
+    their roles and groups.
+  </p>
+  <label class="check mb">
+    <input type="checkbox" name="enable" value="1" {% if client.enable_authorization %}checked{% endif %} />
+    Enable resource-based authorization (RPT in access token)
+  </label>
+  <div class="field">
+    <label class="label">Resources</label>
+    <p class="hint">One per line: <code>name scope scope …</code>. e.g. <code>invoices read write</code></p>
+    <textarea class="textarea" name="resources" rows="5" placeholder="invoices read write&#10;reports read">{{ resources_text }}</textarea>
+  </div>
+  <div class="field">
+    <label class="label">Policies (who can access which resources)</label>
+    <p class="hint">
+      One per line: <code>resourceA,resourceB role:name group:name …</code>.
+      A user gains a resource if they match any policy for it (role <em>or</em>
+      group). A policy with no roles/groups allows any signed-in user.
+    </p>
+    <textarea class="textarea" name="policies" rows="5"
+      placeholder="invoices role:finance group:audit&#10;reports group:engineering&#10;public">{{ policies_text }}</textarea>
+  </div>
+  <div class="row between">
+    <button class="btn btn-primary">Save authorization</button>
+  </div>
+</form>
+
 <!-- Delete client lives in its own form so the type-to-confirm guard doesn't
      intercept the Save action above. -->
 <form method="post" action="/dashboard/clients/{{ client.id }}/delete" class="mt"

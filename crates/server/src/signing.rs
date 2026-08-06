@@ -273,6 +273,7 @@ mod tests {
             roles: vec![],
             groups: vec![],
             attributes: serde_json::Map::new(),
+            authorization: None,
         };
         let token = s.sign(&claims).unwrap();
         let verified = reloaded.verify(&token, "http://issuer.test").unwrap();

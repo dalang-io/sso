@@ -54,6 +54,14 @@ CREATE TABLE IF NOT EXISTS clients (
     include_roles      INTEGER      NOT NULL DEFAULT 1,
     include_groups     INTEGER      NOT NULL DEFAULT 1,
     include_attributes INTEGER      NOT NULL DEFAULT 1,
+    -- Resource-based authorization (Keycloak UMA-style subset). When enabled
+    -- (default off), the access token carries an `authorization` claim with the
+    -- resources/scopes the signed-in user may access, per `policies`.
+    enable_authorization INTEGER    NOT NULL DEFAULT 0,
+    -- JSON array of resources: [{name, scopes:[...]}].
+    resources          TEXT         NOT NULL DEFAULT '[]',
+    -- JSON array of policies: [{name, resources:[...], roles:[...], groups:[...]}].
+    policies           TEXT         NOT NULL DEFAULT '[]',
     created_at         VARCHAR(40)  NOT NULL
 );
 

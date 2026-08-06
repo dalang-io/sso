@@ -131,6 +131,9 @@ pub async fn create(
         include_roles: true,
         include_groups: true,
         include_attributes: true,
+        enable_authorization: false,
+        resources: vec![],
+        policies: vec![],
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
@@ -176,6 +179,8 @@ pub async fn detail(
             redirect_uris_text => client.redirect_uris.join("\n"),
             allowed_emails_text => client.allowed_emails.join("\n"),
             no_email_filter => client.allowed_emails.is_empty(),
+            resources_text => authz_resources_text(&client),
+            policies_text => authz_policies_text(&client),
         },
     )?;
     Ok(Html(body))
@@ -281,6 +286,140 @@ pub async fn delete(
     }
     state.db.delete_client(&id).await?;
     Ok(Redirect::to("/dashboard"))
+}
+
+/// Form for a client's resource-based authorization config.
+#[derive(Deserialize)]
+pub struct AuthzForm {
+    enable: Option<String>,
+    resources: String,
+    policies: String,
+}
+
+/// POST /dashboard/clients/:id/authz — save resources + policies (line-based).
+pub async fn update_authz(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<AuthzForm>,
+) -> AppResult<impl IntoResponse> {
+    let admin = require_admin(&state, &jar).await?;
+    client_in_scope(&state, &admin, &id).await?;
+    if !admin.can_manage_clients() {
+        return Err(AppError::Forbidden);
+    }
+    let enable = form.enable.is_some();
+    // Reject malformed policy lines explicitly rather than silently dropping.
+    if let Some(bad) = authz_bad_policy(&form.policies) {
+        return Err(AppError::bad(format!(
+            "policy line must be `resourceName,... role:name group:name`: {bad}"
+        )));
+    }
+    let resources = authz_parse_resources(&form.resources);
+    let policies = authz_parse_policies(&form.policies);
+    state
+        .db
+        .update_client_authz(&id, enable, &resources, &policies)
+        .await?;
+    Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
+}
+
+/// Resource lines: `name [scope scope ...]` (name then whitespace-separated scopes).
+fn authz_parse_resources(input: &str) -> Vec<crate::models::ClientResource> {
+    input
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let name = it.next()?.to_string();
+            Some(crate::models::ClientResource {
+                name,
+                scopes: it.map(|s| s.to_string()).collect(),
+            })
+        })
+        .collect()
+}
+
+/// Policy lines: `resourceName,resourceName role:r group:g ...`
+fn authz_parse_policies(input: &str) -> Vec<crate::models::Policy> {
+    input
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let name = it.next().unwrap_or("");
+            if name.is_empty() {
+                return None;
+            }
+            let mut policy = crate::models::Policy {
+                name: name.to_string(),
+                resources: name.split(',').map(|s| s.to_string()).collect(),
+                roles: vec![],
+                groups: vec![],
+            };
+            for tok in it {
+                if let Some(r) = tok.strip_prefix("role:") {
+                    if !r.is_empty() {
+                        policy.roles.push(r.to_string());
+                    }
+                } else if let Some(g) = tok.strip_prefix("group:") {
+                    if !g.is_empty() {
+                        policy.groups.push(g.to_string());
+                    }
+                }
+            }
+            Some(policy)
+        })
+        .collect()
+}
+
+/// Detect a malformed policy token (one that isn't `role:`/`group:` prefixed,
+/// or an empty resource list).
+fn authz_bad_policy(input: &str) -> Option<String> {
+    input.lines().find_map(|l| {
+        let mut it = l.split_whitespace();
+        let head = it.next();
+        if head.is_none_or(|h| h.is_empty() || h.contains(':')) {
+            return Some(l.trim().to_string());
+        }
+        for tok in it {
+            if !tok.starts_with("role:") && !tok.starts_with("group:") {
+                return Some(l.trim().to_string());
+            }
+        }
+        None
+    })
+}
+
+/// Serialize resources for the edit textarea.
+fn authz_resources_text(c: &Client) -> String {
+    c.resources
+        .iter()
+        .map(|r| {
+            if r.scopes.is_empty() {
+                r.name.clone()
+            } else {
+                format!("{} {}", r.name, r.scopes.join(" "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Serialize policies for the edit textarea.
+fn authz_policies_text(c: &Client) -> String {
+    c.policies
+        .iter()
+        .map(|p| {
+            let mut parts: Vec<String> = vec![p.resources.join(",")];
+            for r in &p.roles {
+                parts.push(format!("role:{r}"));
+            }
+            for g in &p.groups {
+                parts.push(format!("group:{g}"));
+            }
+            parts.join(" ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Split a textarea into a trimmed, de-duplicated, non-empty list of entries.

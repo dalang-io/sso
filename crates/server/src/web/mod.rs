@@ -31,6 +31,7 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/clients", post(clients::create))
         .route("/dashboard/clients/:id", get(clients::detail))
         .route("/dashboard/clients/:id/uris", post(clients::update_uris))
+        .route("/dashboard/clients/:id/authz", post(clients::update_authz))
         .route("/dashboard/clients/:id/secrets", post(clients::add_secret))
         .route(
             "/dashboard/clients/:id/secrets/:sid/delete",

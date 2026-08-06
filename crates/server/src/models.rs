@@ -3,7 +3,7 @@
 //! Storing portable primitives is what lets one schema run on SQLite, Postgres,
 //! and MySQL/MariaDB unchanged (see `db`).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// An admin user of the dashboard (not an end-user of a downstream app).
@@ -115,7 +115,45 @@ pub struct Client {
     pub include_roles: bool,
     pub include_groups: bool,
     pub include_attributes: bool,
+    /// Resource-based authorization (a Keycloak UMA-style subset). When enabled,
+    /// the client's access token carries an `authorization` claim with the
+    /// resources/scopes the signed-in user is permitted to access, as evaluated
+    /// against `policies`.
+    pub enable_authorization: bool,
+    /// Named, scope-bearing resources this client owns (e.g. an API path).
+    pub resources: Vec<ClientResource>,
+    /// Who may access which resources, keyed on the user's roles/groups.
+    pub policies: Vec<Policy>,
     pub created_at: String,
+}
+
+/// A resource owned by a client (Keycloak "resource"), optionally with scopes.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ClientResource {
+    pub name: String,
+    #[serde(default)]
+    pub scopes: Vec<String>,
+}
+
+/// An authorization policy: for the listed `resources`, which roles and/or
+/// groups grant access. Empty `roles` + `groups` = any authenticated user.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Policy {
+    pub name: String,
+    #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
+    pub roles: Vec<String>,
+    #[serde(default)]
+    pub groups: Vec<String>,
+}
+
+/// A granted permission (requesting-party-token style): a resource the user may
+/// access, with its scopes.
+#[derive(Clone, Debug, Serialize)]
+pub struct Permission {
+    pub rsname: String,
+    pub scopes: Vec<String>,
 }
 
 impl Client {
@@ -124,6 +162,44 @@ impl Client {
     pub fn email_allowed(&self, email: &str) -> bool {
         email_allowed(email, &self.allowed_emails)
     }
+
+    /// Evaluate this client's policies against a user's roles/groups and return
+    /// the resources (with scopes) the user is permitted to access.
+    ///
+    /// A resource is granted when *any* policy covering it matches the user. A
+    /// policy matches when the user has any of the policy's roles OR any of its
+    /// groups; a policy with neither roles nor groups allows any user. A granted
+    /// resource yields all of its declared scopes.
+    pub fn granted_permissions(
+        &self,
+        user_roles: &[String],
+        user_groups: &[String],
+    ) -> Vec<Permission> {
+        if !self.enable_authorization {
+            return vec![];
+        }
+        let mut granted: Vec<Permission> = Vec::new();
+        for res in &self.resources {
+            let allowed = self.policies.iter().any(|p| {
+                p.resources.contains(&res.name) && policy_matches(p, user_roles, user_groups)
+            });
+            if allowed {
+                granted.push(Permission {
+                    rsname: res.name.clone(),
+                    scopes: res.scopes.clone(),
+                });
+            }
+        }
+        granted
+    }
+}
+
+/// Whether an end user (by roles/groups) satisfies a policy.
+fn policy_matches(p: &Policy, roles: &[String], groups: &[String]) -> bool {
+    if p.roles.is_empty() && p.groups.is_empty() {
+        return true; // any authenticated user
+    }
+    p.roles.iter().any(|r| roles.contains(r)) || p.groups.iter().any(|g| groups.contains(g))
 }
 
 /// The maximum number of live secrets a client may hold at once.
@@ -207,7 +283,7 @@ pub struct RefreshToken {
 
 #[cfg(test)]
 mod tests {
-    use super::email_allowed;
+    use super::{email_allowed, Client, ClientResource, Policy};
 
     fn pats(s: &[&str]) -> Vec<String> {
         s.iter().map(|x| x.to_string()).collect()
@@ -240,6 +316,89 @@ mod tests {
         assert!(email_allowed("x@dalang.io", &p));
         assert!(email_allowed("vip@example.com", &p));
         assert!(!email_allowed("nope@example.com", &p));
+    }
+
+    fn s(v: &[&str]) -> Vec<String> {
+        v.iter().map(|x| x.to_string()).collect()
+    }
+
+    fn client_with_authz() -> Client {
+        Client {
+            id: "c".into(),
+            client_id: "cid".into(),
+            tenant_id: None,
+            name: "c".into(),
+            js_origins: vec![],
+            redirect_uris: vec![],
+            allowed_emails: vec![],
+            include_roles: true,
+            include_groups: true,
+            include_attributes: true,
+            enable_authorization: true,
+            resources: vec![
+                ClientResource {
+                    name: "invoices".into(),
+                    scopes: s(&["read", "write"]),
+                },
+                ClientResource {
+                    name: "reports".into(),
+                    scopes: s(&["read"]),
+                },
+                ClientResource {
+                    name: "public-api".into(),
+                    scopes: vec![],
+                },
+            ],
+            policies: vec![
+                Policy {
+                    name: "finance".into(),
+                    resources: s(&["invoices"]),
+                    roles: s(&["finance"]),
+                    groups: vec![],
+                },
+                Policy {
+                    name: "eng".into(),
+                    resources: s(&["reports"]),
+                    roles: vec![],
+                    groups: s(&["engineering"]),
+                },
+                Policy {
+                    name: "open".into(),
+                    resources: s(&["public-api"]),
+                    roles: vec![],
+                    groups: vec![],
+                },
+            ],
+            created_at: "".into(),
+        }
+    }
+
+    #[test]
+    fn authz_grants_by_role_and_group() {
+        let c = client_with_authz();
+        // finance role -> invoices; engineering group -> reports; open -> public.
+        let p = c.granted_permissions(&s(&["admin", "finance"]), &s(&["engineering"]));
+        let names: Vec<String> = p.iter().map(|x| x.rsname.clone()).collect();
+        assert!(names.contains(&"invoices".into()));
+        assert!(names.contains(&"reports".into()));
+        assert!(names.contains(&"public-api".into()));
+        let inv = p.iter().find(|x| x.rsname == "invoices").unwrap();
+        assert_eq!(inv.scopes, s(&["read", "write"]));
+    }
+
+    #[test]
+    fn authz_no_match_grants_nothing_but_open() {
+        let c = client_with_authz();
+        let p = c.granted_permissions(&s(&["nobody"]), &s(&["whatever"]));
+        let names: Vec<String> = p.iter().map(|x| x.rsname.clone()).collect();
+        assert_eq!(names, vec!["public-api".to_string()]);
+    }
+
+    #[test]
+    fn authz_disabled_grants_nothing() {
+        let mut c = client_with_authz();
+        c.enable_authorization = false;
+        assert!(c.granted_permissions(&s(&["finance"]), &[]).is_empty());
     }
 }
 

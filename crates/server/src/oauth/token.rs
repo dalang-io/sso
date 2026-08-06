@@ -216,6 +216,25 @@ async fn issue(
     // client's per-claim mapping (which claims this client wants). For
     // `client_credentials` (subject = client_id, no user) these are empty.
     let user = state.db.user_by_email(subject).await?;
+
+    // Resource-based authorization: an RPT-style `authorization` grant evaluated
+    // from the user's real roles/groups against the client's policies.
+    let authorization = match &user {
+        Some(u) => {
+            let perms = client.granted_permissions(&u.roles, &u.groups);
+            if perms.is_empty() {
+                None
+            } else {
+                let list: Vec<serde_json::Value> = perms
+                    .iter()
+                    .map(|p| serde_json::json!({ "rsname": p.rsname, "scopes": p.scopes }))
+                    .collect();
+                Some(serde_json::json!({ "permissions": list }))
+            }
+        }
+        None => None,
+    };
+
     let (roles, groups, attributes) = match &user {
         Some(u) => (
             if client.include_roles {
@@ -251,6 +270,7 @@ async fn issue(
             roles: roles.clone(),
             groups: groups.clone(),
             attributes: attributes.clone(),
+            authorization: authorization.clone(),
         })
         .map_err(AppError::Other)?;
 
@@ -270,6 +290,7 @@ async fn issue(
                     roles,
                     groups,
                     attributes,
+                    authorization: None,
                 })
                 .map_err(AppError::Other)?,
         )
