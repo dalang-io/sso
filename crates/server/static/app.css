@@ -66,12 +66,16 @@ textarea:focus-visible, select:focus-visible, summary:focus-visible {
 code, pre, .mono { font-family: var(--mono); }
 
 /* ---- layout ---- */
-.container { max-width: 60rem; margin: 0 auto; padding: 0 1.5rem; }
+.container { max-width: 74rem; margin: 0 auto; padding: 0 1.5rem; }
 .container-sm { max-width: 30rem; }
 .main { padding: 2.5rem 0; }
 
 .site-header { border-bottom: 2px solid var(--black); background: var(--white); }
 .site-header .container { display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; padding-bottom: 1rem; }
+@media (max-width: 600px) {
+  .site-header .container { flex-wrap: wrap; row-gap: 0.6rem; }
+  .wrap-nav { gap: 0.85rem; flex-wrap: wrap; }
+}
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 800; color: var(--black); font-size: 1.05rem; letter-spacing: -0.02em; }
 .brand:hover { text-decoration: none; }
 .brand img { display: block; height: 30px; width: auto; object-fit: contain; }
@@ -176,18 +180,20 @@ form.inline { display: inline-block; margin: 0; }
 .wrap-nav a { color: var(--black); font-weight: 700; font-size: 0.9rem; }
 .wrap-nav a:hover { color: var(--primary-hover); text-decoration: none; }
 
-.hero { padding: 3.5rem 0 2.5rem; }
+.hero { padding: 4rem 0 3rem; }
 .hero .eyebrow { margin-bottom: 1rem; }
-.hero h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; max-width: 18ch; }
-.hero .lede { font-size: 1.2rem; line-height: 1.6; color: #334155; max-width: 58ch; margin: 1rem 0 1.75rem; }
+.hero h1 { font-size: clamp(2rem, 4.6vw, 3.4rem); line-height: 1.04; max-width: 18ch; }
+.hero .lede { font-size: 1.2rem; line-height: 1.6; color: #334155; max-width: 60ch; margin: 1rem 0 1.75rem; }
 .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.hero-cols { display: grid; gap: 2rem; align-items: center; }
+.hero-cols { display: grid; gap: 2.5rem; align-items: center; }
 @media (min-width: 900px) { .hero-cols { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
-.hero-art { width: 100%; height: auto; filter: drop-shadow(0 18px 36px rgba(15, 23, 42, 0.22)); }
+.hero-art { width: 100%; height: auto; filter: drop-shadow(0 18px 36px rgba(15, 23, 42, 0.2)); }
+/* A dense flow diagram reads poorly on small phones — show the clean copy instead. */
+@media (max-width: 620px) { .hero-art { display: none; } }
 @keyframes flowdash { to { stroke-dashoffset: -24; } }
 .flow { stroke-dasharray: 6 6; animation: flowdash 1.4s linear infinite; }
 
-.section { padding: 2.5rem 0; }
+.section { padding: 3.5rem 0; }
 .section-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
 .feature-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
 @media (min-width: 640px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
@@ -199,7 +205,7 @@ form.inline { display: inline-block; margin: 0; }
 .feature p { font-size: 0.95rem; line-height: 1.6; color: #334155; margin: 0; }
 
 .band { border-top: 2px solid var(--black); border-bottom: 2px solid var(--black); background: #111827; }
-.band .container { padding: 2.5rem 1.5rem; }
+.band .container { padding: 3rem 1.5rem; }
 .band .section-title { color: var(--white); }
 .band .small { color: #cbd5e1; }
 /* keep the comparison table light-on-dark-band readable (white card, dark text) */
