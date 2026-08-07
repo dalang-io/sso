@@ -19,9 +19,17 @@ The project's production servers (either address reaches the same box):
 SSO_HOST=root@2001:df6:d2c0:4::121 ./deploy/deploy.sh
 ```
 
-`deploy.sh` never overwrites a remote `.env`. On first deploy it seeds
-`.env.example` to `/opt/dalang-sso/.env` — **edit it on the server and set real
-secrets before the first real start**:
+For finer control (e.g. to avoid a single long build+upload step), run the two
+phases separately:
+
+```bash
+./deploy/build.sh     # build only  -> ./target/<triple>/release/sso
+./deploy/upload.sh    # upload + restart (needs a binary from build.sh or a release asset)
+```
+
+`deploy.sh` is just `build.sh` + `upload.sh`. Neither script ever overwrites a
+remote `.env`. On first deploy it seeds `.env.example` to `/opt/dalang-sso/.env`
+— **edit it on the server and set real secrets before the first real start**:
 
 ```bash
 ssh root@163.128.55.121
