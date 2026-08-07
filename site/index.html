@@ -185,25 +185,49 @@
     </section>
 
     <section class="container section">
-      <div class="feature-grid"> 
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-          <h3>Roles, groups &amp; attributes</h3><p>Every user carries <code>roles</code>, <code>groups</code>, and custom <code>attributes</code>, echoed straight into id/access tokens. Enforce on the client side without a DB round-trip.</p></div>
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
-          <h3>Per-client claim mapping</h3><p>Each app opts into which claims it receives — roles, groups, or attributes can be included or stripped per client to keep tokens lean and scoped.</p></div>
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div>
-          <h3>Resource-based authorization</h3><p>Define resources and role/group policies per client. The access token becomes a requesting-party token (<code>authorization</code> claim) listing what the user can do.</p></div>
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
-          <h3>Token introspection</h3><p>RFC 7662 <code>/oauth/introspect</code> — a resource server can centrally authenticate and read any access or refresh token, including its RPT permissions.</p></div>
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 12.5l3 3 6-6"/></svg></div>
-          <h3>TOTP two-factor</h3><p>Standard TOTP (RFC 6238) via any authenticator app. Mandate it per client, and let users enroll their own 2FA on a self-service page.</p></div>
-        <div class="feature">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-          <h3>End-user self-service</h3><p>Each user gets an <code>/account</code> page: change their password, and enroll or disable their own 2FA — no admin needed.</p></div>
+      <div class="feature-list">
+        <div class="feature-item">
+          <span class="fi-num">01</span>
+          <div class="fi-body">
+            <h3>Roles, groups &amp; attributes</h3>
+            <p>Every user carries <code>roles</code>, <code>groups</code>, and custom <code>attributes</code>, echoed straight into id/access tokens — so you can enforce on the client side without a DB round-trip.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-num">02</span>
+          <div class="fi-body">
+            <h3>Per-client claim mapping</h3>
+            <p>Each app opts into which claims it receives — roles, groups, or attributes can be included or stripped per client to keep tokens lean and scoped.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-num">03</span>
+          <div class="fi-body">
+            <h3>Resource-based authorization</h3>
+            <p>Define resources and role/group policies per client. The access token becomes a requesting-party token (<code>authorization</code> claim) listing exactly what the user can do.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-num">04</span>
+          <div class="fi-body">
+            <h3>Token introspection</h3>
+            <p>RFC 7662 <code>/oauth/introspect</code> — a resource server can centrally authenticate and read any access or refresh token, including its RPT permissions.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-num">05</span>
+          <div class="fi-body">
+            <h3>TOTP two-factor</h3>
+            <p>Standard TOTP (RFC 6238) via any authenticator app. Mandate it per client, and let users enroll their own 2FA on a self-service page.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-num">06</span>
+          <div class="fi-body">
+            <h3>End-user self-service</h3>
+            <p>Each user gets an <code>/account</code> page: change their password, and enroll or disable their own 2FA — no admin needed.</p>
+          </div>
+        </div>
       </div>
     </section>
 
