@@ -178,6 +178,17 @@ impl Db {
         Ok(())
     }
 
+    /// Set a member's role. Returns `false` if the member doesn't exist.
+    pub async fn update_admin_role(&self, id: &str, role: &str) -> anyhow::Result<bool> {
+        let sql = self.q("UPDATE admins SET role = ? WHERE id = ?");
+        let res = sqlx::query(&sql)
+            .bind(role)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
     // ---- tenants -----------------------------------------------------------
 
     pub async fn count_tenants(&self) -> anyhow::Result<i64> {

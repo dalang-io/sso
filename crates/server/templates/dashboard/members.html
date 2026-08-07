@@ -5,6 +5,7 @@
 <p class="muted small mb-lg">
   Dashboard users. <strong>Managers</strong> manage clients in their tenant;
   <strong>developers</strong> can only rotate secrets. Super admins are global.
+  Change a member's role right in the table — no need to remove and re-add.
 </p>
 
 <div class="panel mb-lg">
@@ -45,9 +46,23 @@
       <tr>
         <td>{{ m.email }}{% if m.id == self_id %} <span class="muted tiny">(you)</span>{% endif %}</td>
         <td>
-          {% if m.role == "super" %}<span class="badge badge-super">super</span>
-          {% elif m.role == "manager" %}<span class="badge badge-primary">manager</span>
-          {% else %}<span class="badge badge-neutral">developer</span>{% endif %}
+          {% if m.role == "super" %}
+            <span class="badge badge-super">super</span>
+          {% elif m.id == self_id or m.role not in roles %}
+            {% if m.role == "manager" %}<span class="badge badge-primary">manager</span>
+            {% else %}<span class="badge badge-neutral">developer</span>{% endif %}
+          {% else %}
+            <!-- Inline role edit: changing the select updates the role in place. -->
+            <form method="post" action="/dashboard/members/{{ m.id }}/role" class="inline">
+              <select class="input input-sm" name="role" onchange="this.form.submit()"
+                      aria-label="Role of {{ m.email }}"
+                      {% if m.role == "manager" %}title="manager — can create/edit clients and secrets"
+                      {% else %}title="developer — can only rotate secrets"{% endif %}>
+                <option value="manager" {% if m.role == "manager" %}selected{% endif %}>manager</option>
+                <option value="developer" {% if m.role == "developer" %}selected{% endif %}>developer</option>
+              </select>
+            </form>
+          {% endif %}
         </td>
         <td class="small">{{ tenant_names[m.tenant_id] if m.tenant_id else "— global —" }}</td>
         <td style="text-align:right">

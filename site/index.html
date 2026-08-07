@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dalang SSO — the open-source Keycloak alternative (OAuth 2.0 / OIDC)</title>
-  <meta name="description" content="Dalang SSO is a lightweight, self-hosted, open-source Keycloak alternative. OAuth 2.0 / OpenID Connect provider in Rust: multi-tenant RBAC, post-quantum tokens, SDKs for 6 languages, runs airgapped, any database. A single 7 MB binary." />
+  <title>Dalang SSO — open-source Keycloak alternative (OAuth 2.0 / OIDC, MFA, fine-grained authorization)</title>
+  <meta name="description" content="Dalang SSO is a lightweight, self-hosted, open-source Keycloak alternative. OAuth 2.0 / OpenID Connect in Rust: multi-tenant RBAC, roles/groups per user, fine-grained resource authorization (RPT), TOTP MFA, token introspection, post-quantum tokens, 6-language SDKs, airgap & any database. One tiny binary." />
   <link rel="canonical" href="https://sso.dalang.io/" />
   <link rel="icon" href="/assets/favicon?v={{ asset_version }}" />
   <link rel="stylesheet" href="/assets/app.css?v={{ asset_version }}" />
@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="Dalang SSO — open-source Keycloak alternative" />
   <meta name="twitter:description" content="Self-hosted OAuth 2.0 / OIDC in Rust. Multi-tenant, post-quantum, 6 SDKs, airgap-ready." />
-  <meta name="keywords" content="keycloak alternative, open source SSO, self-hosted OAuth2, OpenID Connect provider, identity provider, IdP, rust auth, multi-tenant SSO, post-quantum authentication" />
+  <meta name="keywords" content="keycloak alternative, open source SSO, self-hosted OAuth2, OpenID Connect provider, identity provider, IdP, rust auth, multi-tenant SSO, post-quantum authentication, MFA TOTP, fine-grained authorization, RBAC, token introspection, resource-based access control" />
   <meta name="robots" content="index, follow" />
 
   <!-- Structured data: helps search + AI engines (GEO) understand & cite this. -->
@@ -35,7 +35,7 @@
     "downloadUrl": "https://github.com/dalang-io/sso/releases",
     "license": "https://www.apache.org/licenses/LICENSE-2.0",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "softwareVersion": "0.1.0",
+    "softwareVersion": "0.2.2",
     "author": { "@type": "Organization", "name": "Dalang", "url": "https://dalang.io" }
   }
   </script>
@@ -51,7 +51,11 @@
       { "@type": "Question", "name": "What databases does Dalang SSO support?",
         "acceptedAnswer": { "@type": "Answer", "text": "SQLite by default (zero setup), plus PostgreSQL and MySQL/MariaDB selected at runtime via the DATABASE_URL. No recompile needed to switch." } },
       { "@type": "Question", "name": "Is Dalang SSO post-quantum secure?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Optionally. Token signing can be switched to ML-DSA (FIPS 204) so access and id tokens are quantum-resistant; the classical RS256 default keeps maximum interop." } }
+        "acceptedAnswer": { "@type": "Answer", "text": "Optionally. Token signing can be switched to ML-DSA (FIPS 204) so access and id tokens are quantum-resistant; the classical RS256 default keeps maximum interop." } },
+      { "@type": "Question", "name": "Does Dalang SSO support two-factor authentication?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Standard TOTP (RFC 6238) works with any authenticator app; admins can require it per client, and end users can enroll/disable their own 2FA on a self-service account page." } },
+      { "@type": "Question", "name": "Can it do fine-grained authorization like Keycloak?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Users carry roles, groups and custom attributes that are echoed into tokens, clients can map which claims they receive, and per-client resources + role/group policies produce Keycloak-style requesting-party tokens (RPT) with an authorization claim. A standard RFC 7662 introspection endpoint lets resource servers validate centrally." } }
     ]
   }
   </script>
@@ -70,17 +74,83 @@
 
   <main>
     <section class="container hero">
-      <span class="eyebrow">Open-source · Apache-2.0</span>
-      <h1>The open-source Keycloak alternative.</h1>
-      <p class="lede">
-        A self-hosted <strong>OAuth 2.0 / OpenID Connect</strong> provider in Rust — your own
-        “Sign in with…”, on your domain. Multi-tenant RBAC, post-quantum tokens, SDKs for six
-        languages, and airgap-ready. One <strong>7&nbsp;MB binary</strong>, not a JVM.
-      </p>
-      <div class="hero-cta">
-        <a href="/docs" class="btn btn-primary btn-lg">Get started</a>
-        <a href="https://github.com/dalang-io/sso/releases" class="btn btn-secondary btn-lg">Download binary</a>
-        <a href="https://github.com/dalang-io/sso" class="btn btn-secondary btn-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg> Star on GitHub</a>
+      <div class="hero-cols">
+        <div>
+          <span class="eyebrow">Open-source · Apache-2.0</span>
+          <h1>The open-source Keycloak alternative.</h1>
+          <p class="lede">
+            A self-hosted <strong>OAuth 2.0 / OpenID Connect</strong> provider in Rust — your own
+            “Sign in with…”, on your domain. <strong>Fine-grained authorization</strong> (roles, groups,
+            resource-based RPT), <strong>TOTP two-factor</strong>, multi-tenant RBAC, post-quantum tokens,
+            SDKs for six languages, airgap-ready. One <strong>~8&nbsp;MB binary</strong>, not a JVM.
+          </p>
+          <div class="hero-cta">
+            <a href="/docs" class="btn btn-primary btn-lg">Get started</a>
+            <a href="https://github.com/dalang-io/sso/releases" class="btn btn-secondary btn-lg">Download binary</a>
+            <a href="https://github.com/dalang-io/sso" class="btn btn-secondary btn-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg> Star on GitHub</a>
+          </div>
+        </div>
+
+        <!-- Stunning hero SVG: the sign-in → token → authorization flow. -->
+        <svg class="hero-art" viewBox="0 0 640 360" role="img" aria-label="Diagram: app sends the user to Dalang SSO, which enforces MFA, consent and a per-resource policy, then returns a JWT carrying roles, groups and RPT permissions.">
+          <defs>
+            <linearGradient id="gApp" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/>
+            </linearGradient>
+            <linearGradient id="gSSO" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#ef4444"/>
+            </linearGradient>
+            <linearGradient id="gJWT" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#10b981"/><stop offset="1" stop-color="#14b8a6"/>
+            </linearGradient>
+            <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6366f1" stop-opacity="0.12"/>
+              <stop offset="1" stop-color="#10b981" stop-opacity="0.10"/>
+            </linearGradient>
+            <filter id="blur"><feGaussianBlur stdDeviation="6"/></filter>
+          </defs>
+
+          <rect x="12" y="12" width="616" height="336" rx="20" fill="url(#gBg)"/>
+          <rect x="12" y="12" width="616" height="336" rx="20" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+          <!-- App -->
+          <rect x="36" y="112" width="150" height="92" rx="14" fill="#fff" stroke="#1e293b" stroke-width="2" filter="url(#blur)"/>
+          <rect x="36" y="112" width="150" height="92" rx="14" fill="url(#gApp)" stroke="#1e293b" stroke-width="2"/>
+          <text x="111" y="152" text-anchor="middle" fill="#fff" font-family="ui-monospace,monospace" font-size="15" font-weight="800">Your app</text>
+          <text x="111" y="174" text-anchor="middle" fill="#eeecff" font-family="ui-monospace,monospace" font-size="11">any language · SDK</text>
+          <text x="69" y="120" text-anchor="middle" fill="#fff" font-family="ui-monospace,monospace" font-size="10" font-weight="700">1 · send to sign-in</text>
+
+          <!-- flow arrow -->
+          <line x1="188" y1="158" x2="244" y2="158" stroke="#1e293b" stroke-width="2" stroke-dasharray="6 6" class="flow"/>
+          <polygon points="250,158 238,151 238,165" fill="#1e293b"/>
+
+          <!-- SSO -->
+          <rect x="252" y="96" width="160" height="124" rx="14" fill="#fff" stroke="#1e293b" stroke-width="2" filter="url(#blur)"/>
+          <rect x="252" y="96" width="160" height="124" rx="14" fill="url(#gSSO)" stroke="#1e293b" stroke-width="2"/>
+          <text x="332" y="126" text-anchor="middle" fill="#fff" font-family="ui-monospace,monospace" font-size="14" font-weight="800">Dalang SSO</text>
+          <g font-family="ui-monospace,monospace" font-size="10.5" fill="#fff7ed">
+            <circle cx="274" cy="150" r="3" fill="#fff"/><text x="284" y="154">Login + MFA code</text>
+            <circle cx="274" cy="172" r="3" fill="#fff"/><text x="284" y="176">Consent</text>
+            <circle cx="274" cy="194" r="3" fill="#fff"/><text x="284" y="198">Check policy → grant RPT</text>
+          </g>
+
+          <!-- flow arrow -->
+          <line x1="414" y1="158" x2="470" y2="158" stroke="#1e293b" stroke-width="2" stroke-dasharray="6 6" class="flow"/>
+          <polygon points="476,158 464,151 464,165" fill="#1e293b"/>
+
+          <!-- JWT -->
+          <rect x="478" y="112" width="150" height="92" rx="14" fill="#fff" stroke="#1e293b" stroke-width="2" filter="url(#blur)"/>
+          <rect x="478" y="112" width="150" height="92" rx="14" fill="url(#gJWT)" stroke="#1e293b" stroke-width="2"/>
+          <text x="553" y="142" text-anchor="middle" fill="#fff" font-family="ui-monospace,monospace" font-size="12" font-weight="800">JWT</text>
+          <g font-family="ui-monospace,monospace" font-size="9.5" fill="#ecfeff">
+            <text x="500" y="162">roles · groups</text>
+            <text x="500" y="176">attributes</text>
+            <text x="500" y="190">authorization (RPT)</text>
+          </g>
+
+          <text x="36" y="285" fill="#334155" font-family="ui-monospace,monospace" font-size="11" opacity="0.85">One binary · your domain · tokens are self-verifying JWTs (RS256 or ML-DSA)</text>
+          <text x="36" y="322" fill="#facc15" font-family="ui-monospace,monospace" font-size="12" font-weight="800">2FA · roles/groups · fine-grained access · introspection</text>
+        </svg>
       </div>
     </section>
 
@@ -109,8 +179,38 @@
 
     <section class="band">
       <div class="container">
+        <h2 class="section-title" style="margin-bottom:0.5rem">Fine-grained, Keycloak-style — built in</h2>
+        <p class="small" style="margin-bottom:1.25rem">Not just “sign in”. Control exactly what each app and each user can do, with tokens that carry the answer.</p>
+      </div>
+    </section>
+
+    <section class="container section">
+      <div class="feature-grid"> 
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+          <h3>Roles, groups &amp; attributes</h3><p>Every user carries <code>roles</code>, <code>groups</code>, and custom <code>attributes</code>, echoed straight into id/access tokens. Enforce on the client side without a DB round-trip.</p></div>
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+          <h3>Per-client claim mapping</h3><p>Each app opts into which claims it receives — roles, groups, or attributes can be included or stripped per client to keep tokens lean and scoped.</p></div>
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div>
+          <h3>Resource-based authorization</h3><p>Define resources and role/group policies per client. The access token becomes a requesting-party token (<code>authorization</code> claim) listing what the user can do.</p></div>
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <h3>Token introspection</h3><p>RFC 7662 <code>/oauth/introspect</code> — a resource server can centrally authenticate and read any access or refresh token, including its RPT permissions.</p></div>
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 12.5l3 3 6-6"/></svg></div>
+          <h3>TOTP two-factor</h3><p>Standard TOTP (RFC 6238) via any authenticator app. Mandate it per client, and let users enroll their own 2FA on a self-service page.</p></div>
+        <div class="feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <h3>End-user self-service</h3><p>Each user gets an <code>/account</code> page: change their password, and enroll or disable their own 2FA — no admin needed.</p></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="container">
         <h2 class="section-title" style="margin-bottom:0.5rem">Dalang SSO vs. Keycloak</h2>
-        <p class="small" style="margin-bottom:1.25rem">Both are open-source identity providers. Dalang trades breadth for a small, fast, operable core.</p>
+        <p class="small" style="margin-bottom:1.25rem">Both are open-source identity providers. Dalang packs the commercial-grade features into a small, fast, operable core.</p>
         <div class="table-scroll">
           <table class="table" style="box-shadow:none">
             <thead><tr><th>&nbsp;</th><th>Dalang SSO</th><th>Keycloak</th></tr></thead>
@@ -119,6 +219,10 @@
               <tr><td>Cold start</td><td><strong>Milliseconds</strong></td><td>Tens of seconds</td></tr>
               <tr><td>Default database</td><td><strong>Embedded SQLite</strong></td><td>External RDBMS</td></tr>
               <tr><td>Post-quantum tokens</td><td><strong>Built-in (ML-DSA)</strong></td><td>Not built-in</td></tr>
+              <tr><td>TOTP two-factor</td><td><strong>Built-in + per-client policy</strong></td><td>Yes (theme-dependent)</td></tr>
+              <tr><td>Roles / groups per user</td><td><strong>Built-in, in tokens</strong></td><td>Yes</td></tr>
+              <tr><td>Fine-grained authorization</td><td><strong>Resource-based RPT</strong></td><td>Yes (Authorization Services)</td></tr>
+              <tr><td>Token introspection</td><td><strong>Yes (RFC 7662)</strong></td><td>Yes</td></tr>
               <tr><td>Airgap-friendly</td><td><strong>Yes, by design</strong></td><td>Possible, heavier</td></tr>
               <tr><td>First-run</td><td><strong>Web onboarding</strong></td><td>Admin bootstrap</td></tr>
               <tr><td>License</td><td>Apache-2.0</td><td>Apache-2.0</td></tr>

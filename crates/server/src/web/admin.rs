@@ -186,3 +186,37 @@ pub async fn delete_member(
     state.db.delete_admin(&id).await?;
     Ok(Redirect::to("/dashboard/members"))
 }
+
+#[derive(Deserialize)]
+pub struct RoleForm {
+    role: String,
+}
+
+/// POST /dashboard/members/:id/role — change a member's role in place (no need
+/// to delete and re-create). The `super` role is never assignable here.
+pub async fn update_role(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<RoleForm>,
+) -> AppResult<impl IntoResponse> {
+    let admin = require_super(&state, &jar).await?;
+    if !ASSIGNABLE_ROLES.contains(&form.role.as_str()) {
+        return Err(AppError::bad("role must be manager or developer"));
+    }
+    // Never let the acting super demote themselves into a non-super account
+    // (which would leave nobody able to manage members).
+    if id == admin.id {
+        return Err(AppError::bad("you cannot change your own role here"));
+    }
+    let target = state.db.admin_by_id(&id).await?.ok_or(AppError::NotFound)?;
+    // Only manager/developer members are role-editable; refuse to reassign a
+    // super account through this interface.
+    if target.is_super() {
+        return Err(AppError::bad("super admins are not role-editable"));
+    }
+    if target.role != form.role {
+        state.db.update_admin_role(&id, &form.role).await?;
+    }
+    Ok(Redirect::to("/dashboard/members"))
+}

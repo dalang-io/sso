@@ -37,6 +37,11 @@
         <a href="#what">What is Dalang SSO</a>
         <a href="#quickstart">Quickstart</a>
         <a href="#concepts">Tenants &amp; roles</a>
+        <strong>Fine-grained</strong>
+        <a href="#claims">Roles, groups &amp; claims</a>
+        <a href="#authz">Resource authorization</a>
+        <a href="#mfa">MFA &amp; self-service</a>
+        <a href="#introspect">Token introspection</a>
         <strong>Integrate</strong>
         <a href="#flow">The OAuth flow</a>
         <a href="#endpoints">Endpoints</a>
@@ -91,6 +96,52 @@ cargo run -p sso-server</pre>
         <p>Every client can hold up to <strong>two secrets</strong> for zero-downtime rotation, and can be
         restricted to specific end-user emails (e.g. <code>@yourco.com</code>).</p>
 
+        <h2 id="claims">Fine-grained claims: roles, groups &amp; attributes</h2>
+        <p>Beyond emails, every end user can carry <strong>roles</strong>, <strong>groups</strong> and
+        custom <strong>attributes</strong> (the super-admin “Users” page). When a user signs in, these are
+        echoed into both the id_token and access token:</p>
+        <pre>{
+  "sub": "alice@corp.com", "email": "alice@corp.com",
+  "roles": ["admin", "billing"],
+  "groups": ["engineering"],
+  "attributes": { "department": "platform", "tier": "gold" }
+}</pre>
+        <p>Each client can <strong>map which claims it receives</strong> — untick roles, groups or attributes
+        per client to keep its tokens lean. The claims are embedded in the (self-verifying) JWT, so your app
+        can enforce them with no round-trip to the SSO or a database.</p>
+
+        <h2 id="authz">Resource-based authorization (RPT)</h2>
+        <p>For fine-grained access control, a client can <strong>enable authorization</strong>, define
+        <strong>resources</strong> (with scopes) and <strong>policies</strong> (which roles/groups may
+        access each resource). At token issuance the server evaluates the signed-in user against the
+        policies and embeds a Keycloak-style requesting-party-token claim:</p>
+        <pre>{
+  "sub": "alice@corp.com",
+  "authorization": {
+    "permissions": [
+      { "rsname": "invoices", "scopes": ["read", "write"] },
+      { "rsname": "reports",  "scopes": ["read"] }
+    ]
+  }
+}</pre>
+        <p>Policies are simple line-based rules (<code>invoices role:finance group:audit</code>); a policy
+        with no roles/groups allows any signed-in user. Your resource server enforces on <code>authorization</code>
+        directly, or centrally via <a href="#introspect">introspection</a>.</p>
+
+        <h2 id="mfa">Two-factor authentication &amp; self-service</h2>
+        <p>End users can have <strong>TOTP</strong> (RFC 6238) two-factor auth enrolled — by an admin on the
+        Users page, or by the user themselves on their <code>/account</code> page (which also lets them change
+        their password). Once enrolled, sign-in requires a 6-digit code from any authenticator app. A client
+        can mark “Require two-factor authentication” so every one of its users must have (and use) 2FA;
+        self-registration to such a client is refused until an admin provisions the account.</p>
+
+        <h2 id="introspect">Token introspection</h2>
+        <p><code>POST /oauth/introspect</code> (RFC 7662) lets a resource server authenticate with the same
+        client credentials as the token endpoint and learn about a token it has received. Access/id tokens are
+        introspected as self-verifying JWTs (no DB), returning <code>active</code>, standard claims and the
+        fine-grained claims — including the RPT <code>authorization</code> grant. Refresh tokens are resolved
+        by hash and report their validity, owner and expiry.</p>
+
         <h2 id="flow">The OAuth flow</h2>
         <pre>App ──1 authorize URL──▸ Browser ──▸ /oauth/authorize   (user logs in + consents)
 App ◀─2 redirect ?code=… ── Browser
@@ -110,7 +161,9 @@ App ──5 GET /oauth/userinfo (Bearer access_token) ────────�
             <tr><td><code>/oauth/authorize</code></td><td>Authorization + login + consent</td></tr>
             <tr><td><code>/oauth/token</code></td><td>Token endpoint (all grants)</td></tr>
             <tr><td><code>/oauth/userinfo</code></td><td>UserInfo (Bearer access token)</td></tr>
-            <tr><td><code>/dashboard</code></td><td>Admin dashboard (manage apps)</td></tr>
+            <tr><td><code>/oauth/introspect</code></td><td>Token introspection (RFC 7662)</td></tr>
+            <tr><td><code>/account</code></td><td>End-user self-service (MFA, password)</td></tr>
+            <tr><td><code>/dashboard</code></td><td>Admin dashboard (manage apps + users)</td></tr>
             <tr><td><code>/setup</code></td><td>One-time first-admin onboarding</td></tr>
           </tbody>
         </table>
@@ -169,6 +222,13 @@ me, _ := sso.UserInfo(tokens.AccessToken)</pre>
           world-known cookie key.</li>
           <li><strong>Argon2id</strong> password/secret hashing; secrets stored only as hashes and shown
           in plaintext exactly once.</li>
+          <li><strong>TOTP two-factor</strong> for end users, with per-client “require MFA” policy and
+          self-service enrollment.</li>
+          <li><strong>Rate limiting &amp; account lockout</strong> on every credential endpoint (login,
+          register, MFA, password change) — per IP and per account — plus a fail-closed placeholder-secret
+          check.</li>
+          <li><strong>CSRF protection</strong> on every state-changing browser form (double-submit cookie)
+          and layered security headers (<code>SameSite</code>, clickjacking, HSTS, <code>nosniff</code>).</li>
         </ul>
 
         <h2 id="config">Configuration</h2>
@@ -181,6 +241,7 @@ me, _ := sso.UserInfo(tokens.AccessToken)</pre>
             <tr><td><code>DATABASE_URL</code></td><td><code>sqlite://data/sso.db</code></td><td>SQLite / Postgres / MySQL</td></tr>
             <tr><td><code>SSO_SESSION_SECRET</code></td><td>dev default</td><td>Cookie signing key — <strong>required</strong> in production</td></tr>
             <tr><td><code>SSO_JWT_PRIVATE_KEY_PATH</code></td><td>ephemeral</td><td>Persistent RSA key — set so tokens survive restarts</td></tr>
+            <tr><td><code>SSO_MLDSA_KEY_PATH</code></td><td>ephemeral</td><td>Persisted ML-DSA key for <code>ml-dsa-65</code> (stable across restarts &amp; nodes)</td></tr>
             <tr><td><code>SSO_TOKEN_SIGNING_ALG</code></td><td><code>rs256</code></td><td><code>rs256</code> or <code>ml-dsa-65</code> (PQC)</td></tr>
             <tr><td><code>SSO_BRAND_TITLE</code></td><td><code>Dalang SSO</code></td><td>Dashboard title</td></tr>
             <tr><td><code>SSO_LOGO_PATH</code> / <code>SSO_FAVICON_PATH</code></td><td>bundled</td><td>Custom local branding</td></tr>
