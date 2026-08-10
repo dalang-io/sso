@@ -119,6 +119,29 @@ pub struct Group {
     pub name: String,
 }
 
+/// An active end-user session (Keycloak-style). One row per token issue.
+#[derive(Clone, Debug, Serialize)]
+pub struct Session {
+    pub id: String,
+    pub email: String,
+    pub client_id: Option<String>,
+    pub user_agent: Option<String>,
+    pub ip: Option<String>,
+    pub created_at: String,
+    pub expires_at: String,
+}
+
+/// An append-only audit-log entry.
+#[derive(Clone, Debug, Serialize)]
+pub struct AuditEvent {
+    pub id: String,
+    pub at: String,
+    pub actor: String,
+    pub action: String,
+    pub detail: Option<String>,
+    pub client_id: Option<String>,
+}
+
 /// A registered OAuth 2.0 client — the equivalent of a "Google Cloud project
 /// credential". Owns its authorized origins and redirect URIs.
 #[derive(Clone, Debug, Serialize)]

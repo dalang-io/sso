@@ -479,6 +479,90 @@ impl Db {
         Ok(())
     }
 
+    // ---- sessions ---------------------------------------------------------
+
+    /// Record an active session for a successfully-issued user token.
+    pub async fn insert_session(&self, s: &crate::models::Session) -> anyhow::Result<()> {
+        let sql = self.q(
+            "INSERT INTO sessions (id, email, client_id, user_agent, ip, created_at, expires_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+        );
+        sqlx::query(&sql)
+            .bind(&s.id)
+            .bind(&s.email)
+            .bind(&s.client_id)
+            .bind(&s.user_agent)
+            .bind(&s.ip)
+            .bind(&s.created_at)
+            .bind(&s.expires_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// List all active sessions, newest first.
+    pub async fn list_sessions(&self) -> anyhow::Result<Vec<crate::models::Session>> {
+        let rows = sqlx::query("SELECT * FROM sessions ORDER BY created_at DESC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_session).collect())
+    }
+
+    pub async fn delete_session(&self, id: &str) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM sessions WHERE id = ?");
+        sqlx::query(&sql).bind(id).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// Revoke all sessions for an end user (e.g. after disabling/reset).
+    pub async fn delete_sessions_for(&self, email: &str) -> anyhow::Result<()> {
+        let sql = self.q("DELETE FROM sessions WHERE email = ?");
+        sqlx::query(&sql).bind(email).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    // ---- audit log --------------------------------------------------------
+
+    /// Append an audit-log event.
+    pub async fn write_audit(
+        &self,
+        actor: &str,
+        action: &str,
+        detail: &str,
+        client_id: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let evt = crate::models::AuditEvent {
+            id: uuid::Uuid::new_v4().to_string(),
+            at: chrono::Utc::now().to_rfc3339(),
+            actor: actor.to_string(),
+            action: action.to_string(),
+            detail: (!detail.is_empty()).then(|| detail.to_string()),
+            client_id: client_id.map(|s| s.to_string()),
+        };
+        let sql = self.q(
+            "INSERT INTO audit_log (id, at, actor, action, detail, client_id) VALUES (?, ?, ?, ?, ?, ?)",
+        );
+        sqlx::query(&sql)
+            .bind(&evt.id)
+            .bind(&evt.at)
+            .bind(&evt.actor)
+            .bind(&evt.action)
+            .bind(&evt.detail)
+            .bind(&evt.client_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Most recent audit events, newest first, capped at `limit`.
+    pub async fn list_audit(&self, limit: i64) -> anyhow::Result<Vec<crate::models::AuditEvent>> {
+        let rows = sqlx::query("SELECT * FROM audit_log ORDER BY at DESC LIMIT ?")
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_audit).collect())
+    }
+
     // ---- clients -----------------------------------------------------------
 
     pub async fn list_clients(&self) -> anyhow::Result<Vec<Client>> {
@@ -916,6 +1000,29 @@ fn row_to_group(r: &AnyRow) -> crate::models::Group {
     crate::models::Group {
         id: r.get("id"),
         name: r.get("name"),
+    }
+}
+
+fn row_to_session(r: &AnyRow) -> crate::models::Session {
+    crate::models::Session {
+        id: r.get("id"),
+        email: r.get("email"),
+        client_id: r.get("client_id"),
+        user_agent: r.get("user_agent"),
+        ip: r.get("ip"),
+        created_at: r.get("created_at"),
+        expires_at: r.get("expires_at"),
+    }
+}
+
+fn row_to_audit(r: &AnyRow) -> crate::models::AuditEvent {
+    crate::models::AuditEvent {
+        id: r.get("id"),
+        at: r.get("at"),
+        actor: r.get("actor"),
+        action: r.get("action"),
+        detail: r.get("detail"),
+        client_id: r.get("client_id"),
     }
 }
 

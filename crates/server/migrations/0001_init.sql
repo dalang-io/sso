@@ -123,3 +123,27 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_auth_codes_client ON auth_codes (client_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_client ON refresh_tokens (client_id);
+
+-- Active end-user sessions (Keycloak-style). Records a row per token issue so
+-- admins can see and revoke where a user is signed in.
+CREATE TABLE IF NOT EXISTS sessions (
+    id         VARCHAR(36)  PRIMARY KEY,
+    email      VARCHAR(320) NOT NULL,
+    client_id  VARCHAR(64),
+    user_agent VARCHAR(255),
+    ip         VARCHAR(64),
+    created_at VARCHAR(40)  NOT NULL,
+    expires_at VARCHAR(40)  NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions (email);
+
+-- Append-only audit log of security-relevant events.
+CREATE TABLE IF NOT EXISTS audit_log (
+    id        VARCHAR(64)  PRIMARY KEY,
+    at        VARCHAR(40)  NOT NULL,
+    actor     VARCHAR(320) NOT NULL,
+    action    VARCHAR(64)  NOT NULL,
+    detail    VARCHAR(512),
+    client_id VARCHAR(64)
+);
+CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at);

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Audit · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+<p class="muted small mb-lg">
+  All auth-relevant events (login, register, consent, token issuance), newest
+  first. Super admins only.
+</p>
+
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Detail</th><th>Client id</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td class="mono small">{{ e.at[:10] }} {{ e.at[11:19] }}</td>
+        <td class="small">{{ e.actor }}</td>
+        <td><span class="badge badge-neutral mono">{{ e.action }}</span></td>
+        <td class="small">{{ e.detail or "—" }}</td>
+        <td class="mono small">{{ e.client_id or "—" }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="muted">No audit events recorded yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

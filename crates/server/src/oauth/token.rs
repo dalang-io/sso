@@ -12,7 +12,6 @@ use axum::{Form, Json};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use serde::Deserialize;
-
 #[derive(Debug, Deserialize)]
 pub struct TokenForm {
     pub grant_type: String,
@@ -245,6 +244,31 @@ async fn issue(
         ),
         None => (vec![], vec![], serde_json::Map::new()),
     };
+
+    // Record an active session + an audit event for end-user token issuance.
+    if with_refresh {
+        if let Some(u) = &user {
+            let now = chrono::Utc::now();
+            state
+                .db
+                .insert_session(&crate::models::Session {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    email: u.email.clone(),
+                    client_id: Some(client.client_id.clone()),
+                    user_agent: None,
+                    ip: None,
+                    created_at: now.to_rfc3339(),
+                    expires_at: (now
+                        + chrono::Duration::from_std(state.config.refresh_token_ttl).unwrap())
+                    .to_rfc3339(),
+                })
+                .await?;
+        }
+        state
+            .db
+            .write_audit(subject, "token.issue", scope, Some(&client.client_id))
+            .await?;
+    }
 
     let access = state
         .signer

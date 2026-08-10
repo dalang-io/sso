@@ -235,6 +235,8 @@ pub async fn decide(
     }
 
     let code = crate::crypto::random_token(32);
+    let actor = user.email.clone();
+    let cid = client.client_id.clone();
     let expires =
         chrono::Utc::now() + chrono::Duration::from_std(state.config.auth_code_ttl).unwrap();
     state
@@ -250,6 +252,10 @@ pub async fn decide(
             nonce: f.params.nonce,
             expires_at: expires.to_rfc3339(),
         })
+        .await?;
+    state
+        .db
+        .write_audit(&actor, "consent", &f.decision, Some(&cid))
         .await?;
 
     Ok(Redirect::to(&append_query(

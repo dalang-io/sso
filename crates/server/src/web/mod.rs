@@ -4,9 +4,11 @@
 //! trivial (any node can serve any request).
 
 pub mod admin;
+pub mod audit;
 pub mod clients;
 pub mod groups;
 pub mod roles;
+pub mod sessions;
 pub mod users;
 
 use crate::error::{AppError, AppResult};
@@ -74,6 +76,10 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/groups/:name/delete", post(groups::delete))
         .route("/dashboard/groups/:name/assign", post(groups::assign))
         .route("/dashboard/groups/:name/unassign", post(groups::unassign))
+        // super-admin: sessions + audit log
+        .route("/dashboard/sessions", get(sessions::list))
+        .route("/dashboard/sessions/:id/revoke", post(sessions::revoke))
+        .route("/dashboard/audit", get(audit::list))
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.

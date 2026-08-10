@@ -194,6 +194,10 @@ pub async fn register(
     }
 
     let user = state.db.create_user(email, &f.password).await?;
+    state
+        .db
+        .write_audit(&user.email, "register", "", Some(&client.client_id))
+        .await?;
     let jar = jar.add(session_cookie(user.id, state.config.cookie_secure));
     Ok((
         jar,

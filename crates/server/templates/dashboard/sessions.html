@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Sessions · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Sessions</h1>
+<p class="muted small mb-lg">
+  Active end-user sign-in sessions. Revoking a session takes effect immediately;
+  the user may need to sign in again.
+</p>
+
+{% if sessions %}
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Email</th><th>Client id</th><th>Started</th><th>Expires</th><th></th></tr></thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td class="mono">{{ s.email }}</td>
+        <td class="mono">{{ s.client_id if s.client_id else "—" }}</td>
+        <td class="small">{{ s.created_at[:10] }} <span class="muted">{{ s.created_at[11:16] }} UTC</span></td>
+        <td class="small">{{ s.expires_at[:16] }} UTC</td>
+        <td style="text-align:right">
+          <form method="post" action="/dashboard/sessions/{{ s.id }}/revoke"
+                data-confirm="Revoke this session? The user may need to sign in again.">
+            <button class="btn btn-primary btn-sm">Revoke</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel">
+  <p class="muted">No active sessions right now.</p>
+</div>
+{% endif %}
+{% endblock %}
