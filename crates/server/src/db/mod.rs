@@ -101,6 +101,7 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN policies TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE clients ADD COLUMN require_mfa INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)",
+            "ALTER TABLE users ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -275,6 +276,7 @@ impl Db {
             groups: vec![],
             attributes: std::collections::BTreeMap::new(),
             totp_secret: None,
+            enabled: true,
         };
         // `roles/groups/attributes` default to '[]'/'{}' via the schema; a fresh
         // account has no fine-grained authorization until an admin assigns it.
@@ -357,6 +359,123 @@ impl Db {
             .bind(id)
             .execute(&self.pool)
             .await?;
+        Ok(())
+    }
+
+    /// Enable or disable a user account. Returns `false` if not found.
+    pub async fn set_user_enabled(&self, id: &str, enabled: bool) -> anyhow::Result<bool> {
+        let sql = self.q("UPDATE users SET enabled = ? WHERE id = ?");
+        let res = sqlx::query(&sql)
+            .bind(enabled as i32)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    /// Add `role` to a user's roles (by email). No-op if already present.
+    pub async fn assign_role_to_user(&self, email: &str, role: &str) -> anyhow::Result<()> {
+        self.add_to_user_list(email, "roles", role).await
+    }
+    pub async fn remove_role_from_user(&self, email: &str, role: &str) -> anyhow::Result<()> {
+        self.remove_from_user_list(email, "roles", role).await
+    }
+    pub async fn assign_group_to_user(&self, email: &str, group: &str) -> anyhow::Result<()> {
+        self.add_to_user_list(email, "groups", group).await
+    }
+    pub async fn remove_group_from_user(&self, email: &str, group: &str) -> anyhow::Result<()> {
+        self.remove_from_user_list(email, "groups", group).await
+    }
+
+    async fn add_to_user_list(&self, email: &str, col: &str, value: &str) -> anyhow::Result<()> {
+        let Some(user) = self.user_by_email(email).await? else {
+            return Ok(());
+        };
+        let mut list = user_roles_or_groups(&user, col);
+        if !list.iter().any(|r| r == value) {
+            list.push(value.to_string());
+            self.write_user_list(email, col, &list).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_from_user_list(
+        &self,
+        email: &str,
+        col: &str,
+        value: &str,
+    ) -> anyhow::Result<()> {
+        let Some(user) = self.user_by_email(email).await? else {
+            return Ok(());
+        };
+        let list: Vec<String> = user_roles_or_groups(&user, col)
+            .into_iter()
+            .filter(|r| r != value)
+            .collect();
+        self.write_user_list(email, col, &list).await?;
+        Ok(())
+    }
+
+    async fn write_user_list(&self, email: &str, col: &str, list: &[String]) -> anyhow::Result<()> {
+        let sql = self.q(&format!("UPDATE users SET {col} = ? WHERE email = ?"));
+        sqlx::query(&sql)
+            .bind(serde_json::to_string(list)?)
+            .bind(email)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    // ---- role / group catalogs --------------------------------------------
+
+    pub async fn list_roles(&self) -> anyhow::Result<Vec<crate::models::Role>> {
+        let rows = sqlx::query("SELECT * FROM roles ORDER BY name ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_role).collect())
+    }
+
+    /// Create a role catalog entry. Returns `false` if the name is taken.
+    pub async fn create_role(&self, name: &str) -> anyhow::Result<bool> {
+        self.create_catalog("roles", name).await
+    }
+
+    pub async fn delete_role(&self, name: &str) -> anyhow::Result<()> {
+        self.delete_catalog("roles", name).await
+    }
+
+    pub async fn list_groups(&self) -> anyhow::Result<Vec<crate::models::Group>> {
+        let rows = sqlx::query("SELECT * FROM user_groups ORDER BY name ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.iter().map(row_to_group).collect())
+    }
+
+    /// Create a group catalog entry. Returns `false` if the name is taken.
+    pub async fn create_group(&self, name: &str) -> anyhow::Result<bool> {
+        self.create_catalog("user_groups", name).await
+    }
+
+    pub async fn delete_group(&self, name: &str) -> anyhow::Result<()> {
+        self.delete_catalog("user_groups", name).await
+    }
+
+    async fn create_catalog(&self, table: &str, name: &str) -> anyhow::Result<bool> {
+        let sql = self.q(&format!("INSERT INTO {table} (id, name) VALUES (?, ?)"));
+        let res = sqlx::query(&sql)
+            .bind(uuid::Uuid::new_v4().to_string())
+            .bind(name)
+            .execute(&self.pool)
+            .await;
+        match res {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false), // duplicate/constraint -> name taken
+        }
+    }
+
+    async fn delete_catalog(&self, table: &str, name: &str) -> anyhow::Result<()> {
+        let sql = self.q(&format!("DELETE FROM {table} WHERE name = ?"));
+        sqlx::query(&sql).bind(name).execute(&self.pool).await?;
         Ok(())
     }
 
@@ -750,6 +869,7 @@ fn row_to_user(r: &AnyRow) -> User {
         groups: json_array(r, "groups"),
         attributes: json_object(r, "attributes"),
         totp_secret: r.try_get("totp_secret").ok(),
+        enabled: r.try_get("enabled").unwrap_or(1) != 0,
     }
 }
 
@@ -760,7 +880,6 @@ fn json_array(r: &AnyRow, col: &str) -> Vec<String> {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default()
 }
-
 /// Parse a JSON-object TEXT column into `BTreeMap<String, String>`; empty on
 /// failure. Values are coerced to strings (non-string values are dropped).
 fn json_object(r: &AnyRow, col: &str) -> std::collections::BTreeMap<String, String> {
@@ -776,6 +895,28 @@ fn json_object(r: &AnyRow, col: &str) -> std::collections::BTreeMap<String, Stri
             _ => None,
         })
         .collect()
+}
+
+/// The current roles/groups list for a user (by JSON column name).
+fn user_roles_or_groups(u: &crate::models::User, col: &str) -> Vec<String> {
+    match col {
+        "roles" => u.roles.clone(),
+        _ => u.groups.clone(),
+    }
+}
+
+fn row_to_role(r: &AnyRow) -> crate::models::Role {
+    crate::models::Role {
+        id: r.get("id"),
+        name: r.get("name"),
+    }
+}
+
+fn row_to_group(r: &AnyRow) -> crate::models::Group {
+    crate::models::Group {
+        id: r.get("id"),
+        name: r.get("name"),
+    }
 }
 
 /// Extract the on-disk path from a `sqlite://…` URL so we can pre-create its dir.

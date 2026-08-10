@@ -5,6 +5,8 @@
 
 pub mod admin;
 pub mod clients;
+pub mod groups;
+pub mod roles;
 pub mod users;
 
 use crate::error::{AppError, AppResult};
@@ -59,6 +61,19 @@ pub fn router() -> Router<AppState> {
             "/dashboard/users/:id/totp/disable",
             post(users::disable_totp),
         )
+        .route("/dashboard/users/:id/enable", post(users::enable_user))
+        .route("/dashboard/users/:id/disable", post(users::disable_user))
+        .route("/dashboard/users/:id/password", post(users::reset_password))
+        // super-admin: role catalog
+        .route("/dashboard/roles", get(roles::list).post(roles::create))
+        .route("/dashboard/roles/:name/delete", post(roles::delete))
+        .route("/dashboard/roles/:name/assign", post(roles::assign))
+        .route("/dashboard/roles/:name/unassign", post(roles::unassign))
+        // super-admin: group catalog
+        .route("/dashboard/groups", get(groups::list).post(groups::create))
+        .route("/dashboard/groups/:name/delete", post(groups::delete))
+        .route("/dashboard/groups/:name/assign", post(groups::assign))
+        .route("/dashboard/groups/:name/unassign", post(groups::unassign))
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.

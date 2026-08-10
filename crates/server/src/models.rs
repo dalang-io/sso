@@ -91,6 +91,8 @@ pub struct User {
     pub attributes: BTreeMap<String, String>,
     /// Base32 TOTP secret for two-factor auth; `None` = 2FA not enrolled.
     pub totp_secret: Option<String>,
+    /// Whether the account may sign in; `false` = disabled.
+    pub enabled: bool,
 }
 
 impl User {
@@ -98,6 +100,23 @@ impl User {
     pub fn totp_enabled(&self) -> bool {
         self.totp_secret.as_deref().is_some_and(|s| !s.is_empty())
     }
+}
+
+/// A managed role in the realm's role catalog (Keycloak-style entity). Users
+/// "hold" roles by name (their `users.roles` JSON); this row is the canonical,
+/// admin-managed list.
+#[derive(Clone, Debug, Serialize)]
+pub struct Role {
+    pub id: String,
+    pub name: String,
+}
+
+/// A managed group in the realm's group catalog. Users belong to groups by name
+/// (their `users.groups` JSON); this row is the canonical, admin-managed list.
+#[derive(Clone, Debug, Serialize)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
 }
 
 /// A registered OAuth 2.0 client — the equivalent of a "Google Cloud project

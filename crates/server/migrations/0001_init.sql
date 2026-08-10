@@ -37,7 +37,22 @@ CREATE TABLE IF NOT EXISTS users (
     groups       TEXT NOT NULL DEFAULT '[]',
     attributes   TEXT NOT NULL DEFAULT '{}',
     -- Base32 TOTP secret; NULL = two-factor authentication not enrolled.
-    totp_secret  VARCHAR(64)
+    totp_secret  VARCHAR(64),
+    -- Whether the account may sign in (Keycloak "enabled"); 0 = disabled.
+    enabled      INTEGER NOT NULL DEFAULT 1
+);
+
+-- Role catalog (Keycloak-style entity). A user "has" a role by name in their
+-- users.roles JSON; this table is the managed, canonical list of roles.
+CREATE TABLE IF NOT EXISTS roles (
+    id   VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE
+);
+
+-- Group catalog. Using `user_groups` because `groups` is a SQL reserved word.
+CREATE TABLE IF NOT EXISTS user_groups (
+    id   VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS clients (

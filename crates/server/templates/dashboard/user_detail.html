@@ -66,4 +66,34 @@
   <p class="hint" style="margin:0">No authenticator configured. Enable 2FA to require a one-time code at this user's sign-in.</p>
   {% endif %}
 </div>
+
+<div class="panel mt">
+  <h2 style="margin:0 0 1rem">Account status &amp; password</h2>
+  <div class="row between mb">
+    <div>
+      {% if user.enabled %}
+      <span class="badge badge-primary">Enabled</span>
+      {% else %}
+      <span class="badge badge-neutral">Disabled</span>
+      {% endif %}
+    </div>
+    {% if user.enabled %}
+    <form method="post" action="/dashboard/users/{{ user.id }}/disable"
+          data-confirm="Disable this account? The user will no longer be able to sign in.">
+      <button class="btn btn-sm btn-danger">Disable account</button>
+    </form>
+    {% else %}
+    <form method="post" action="/dashboard/users/{{ user.id }}/enable">
+      <button class="btn btn-sm btn-primary">Enable account</button>
+    </form>
+    {% endif %}
+  </div>
+  <form method="post" action="/dashboard/users/{{ user.id }}/password" class="stack">
+    <div class="field">
+      <label class="label">New password</label>
+      <input class="input" type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" />
+    </div>
+    <div><button class="btn btn-primary">Set new password</button></div>
+  </form>
+</div>
 {% endblock %}

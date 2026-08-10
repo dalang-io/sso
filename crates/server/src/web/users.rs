@@ -125,6 +125,54 @@ pub async fn disable_totp(
     Ok(Redirect::to(&format!("/dashboard/users/{id}")))
 }
 
+/// POST /dashboard/users/:id/enable — re-enable a disabled account.
+pub async fn enable_user(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    state.db.set_user_enabled(&id, true).await?;
+    tracing::info!(user = %user.email, "account enabled by admin");
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
+}
+
+/// POST /dashboard/users/:id/disable — disable an account (user cannot sign in).
+pub async fn disable_user(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    state.db.set_user_enabled(&id, false).await?;
+    tracing::warn!(user = %user.email, "account disabled by admin");
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
+}
+
+#[derive(Deserialize)]
+pub struct PasswordForm {
+    password: String,
+}
+
+/// POST /dashboard/users/:id/password — reset a user's password.
+pub async fn reset_password(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<PasswordForm>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    user_in_scope(&state, &id).await?;
+    let pw = form.password.trim();
+    if pw.len() < 8 {
+        return Err(AppError::bad("password must be at least 8 characters"));
+    }
+    state.db.update_user_password(&id, pw).await?;
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
+}
+
 #[derive(Deserialize)]
 pub struct UserForm {
     roles: String,

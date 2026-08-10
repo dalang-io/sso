@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Groups · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Groups</h1>
+<p class="muted small mb-lg">
+  Group catalog. Users belong to groups by name; group membership is echoed into
+  their id/access tokens so relying parties can enforce access. Assign or revoke
+  membership here — or edit a user's groups directly on their detail page.
+</p>
+
+<div class="panel mb-lg">
+  <h2>Add group</h2>
+  <form method="post" action="/dashboard/groups" class="stack">
+    <div class="grid-2">
+      <div class="field" style="margin:0">
+        <label class="label">Name</label>
+        <input class="input" name="name" type="text" required placeholder="engineering" />
+      </div>
+    </div>
+    <div><button class="btn btn-primary">Add group</button></div>
+  </form>
+</div>
+
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Group</th><th>Members</th><th>Assign</th><th></th></tr></thead>
+    <tbody>
+      {% for g in groups %}
+      <tr>
+        <td><code>{{ g.name }}</code></td>
+        <td class="small">
+          {% set member_emails = [] %}
+          {% for u in users if g.name in u.groups %}{% set member_emails = member_emails.append(u.email) %}{% endfor %}
+          {% if member_emails %}
+            <span class="badge badge-primary">{{ member_emails|length }}</span>
+            <span class="muted">{{ member_emails|join(", ") }}</span>
+          {% else %}
+            <span class="muted">no members</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/dashboard/groups/{{ g.name }}/assign" class="inline">
+            <input class="input input-sm" name="email" type="email" required
+                   placeholder="user@acme.com" aria-label="Email to assign to {{ g.name }}" />
+            <button class="btn btn-sm">Assign</button>
+          </form>
+        </td>
+        <td style="text-align:right">
+          <div class="stack">
+            {% for u in users if g.name in u.groups %}
+            <form method="post" action="/dashboard/groups/{{ g.name }}/unassign" class="inline">
+              <input type="hidden" name="email" value="{{ u.email }}" />
+              <button class="link-danger" data-confirm="Remove {{ u.email }} from {{ g.name }}?">Remove {{ u.email }}</button>
+            </form>
+            {% endfor %}
+            <form method="post" action="/dashboard/groups/{{ g.name }}/delete"
+                  data-confirm="Delete group {{ g.name }}?">
+              <button class="link-danger">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

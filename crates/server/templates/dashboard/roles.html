@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Roles · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Roles</h1>
+<p class="muted small mb-lg">
+  The realm's role catalog. Users hold roles by name (echoed into their tokens);
+  this is the canonical list an admin manages. Assign a role to a user's email
+  to grant it, or remove it with the unassign link.
+</p>
+
+<div class="panel mb-lg">
+  <h2>Add role</h2>
+  <form method="post" action="/dashboard/roles" class="stack">
+    <div class="field" style="margin:0">
+      <label class="label">Role name</label>
+      <input class="input" name="name" type="text" required placeholder="billing" />
+    </div>
+    <div><button class="btn btn-primary">Add role</button></div>
+  </form>
+</div>
+
+{% if roles %}
+<div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Role</th><th>Members</th><th></th></tr></thead>
+    <tbody>
+      {% for r in roles %}
+      {% set holders = namespace(count=0) %}
+      {% for u in users if r.name in u.roles %}{% set holders.count = holders.count + 1 %}{% endfor %}
+      <tr>
+        <td><code>{{ r.name }}</code></td>
+        <td class="small">
+          {{ holders.count }}
+          {% if holders.count %}
+            —
+            {% for u in users if r.name in u.roles %}<span class="badge badge-neutral">{{ u.email }}</span> {% endfor %}
+          {% else %}
+            <span class="muted">no members yet</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right">
+          <div class="inline">
+            <form method="post" action="/dashboard/roles/{{ r.name }}/assign" class="inline">
+              <input class="input input-sm" name="email" type="email" required
+                     placeholder="user@acme.com" aria-label="Assign {{ r.name }} by email" />
+              <button class="btn btn-sm btn-secondary">Assign</button>
+            </form>
+            {% for u in users if r.name in u.roles %}
+            <form method="post" action="/dashboard/roles/{{ r.name }}/unassign" class="inline">
+              <input type="hidden" name="email" value="{{ u.email }}" />
+              <button class="link-danger">Unassign {{ u.email }}</button>
+            </form>
+            {% endfor %}
+            <form method="post" action="/dashboard/roles/{{ r.name }}/delete"
+                  data-confirm="Delete role {{ r.name }}?">
+              <button class="link-danger">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel-muted">No roles yet. Create one above to start assigning it to users.</div>
+{% endif %}
+{% endblock %}
