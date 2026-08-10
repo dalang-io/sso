@@ -100,6 +100,7 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN resources TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE clients ADD COLUMN policies TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE clients ADD COLUMN require_mfa INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE clients ADD COLUMN client_roles TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)",
             "ALTER TABLE users ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
         ] {
@@ -595,8 +596,8 @@ impl Db {
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
              (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, \
-              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, require_mfa, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, client_roles, require_mfa, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -612,6 +613,7 @@ impl Db {
             .bind(client.enable_authorization as i32)
             .bind(serde_json::to_string(&client.resources)?)
             .bind(serde_json::to_string(&client.policies)?)
+            .bind(serde_json::to_string(&client.client_roles)?)
             .bind(client.require_mfa as i32)
             .bind(&client.created_at)
             .execute(&self.pool)
@@ -659,6 +661,83 @@ impl Db {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Set a client's role catalog (client roles).
+    pub async fn update_client_roles(&self, id: &str, roles: &[String]) -> anyhow::Result<()> {
+        let sql = self.q("UPDATE clients SET client_roles = ? WHERE id = ?");
+        sqlx::query(&sql)
+            .bind(serde_json::to_string(roles)?)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Grant a client-scoped role to a user. Returns true if newly granted,
+    /// false if it was already present. Not atomic (admin-only, low race).
+    pub async fn grant_client_role(
+        &self,
+        user_id: &str,
+        client_id: &str,
+        role: &str,
+    ) -> anyhow::Result<bool> {
+        let exists_sql = self.q(
+            "SELECT COUNT(*) AS c FROM user_client_roles WHERE user_id = ? AND client_id = ? AND role = ?",
+        );
+        let row = sqlx::query(&exists_sql)
+            .bind(user_id)
+            .bind(client_id)
+            .bind(role)
+            .fetch_one(&self.pool)
+            .await?;
+        let exists: i64 = row.try_get("c")?;
+        if exists > 0 {
+            return Ok(false);
+        }
+        let sql =
+            self.q("INSERT INTO user_client_roles (user_id, client_id, role) VALUES (?, ?, ?)");
+        sqlx::query(&sql)
+            .bind(user_id)
+            .bind(client_id)
+            .bind(role)
+            .execute(&self.pool)
+            .await?;
+        Ok(true)
+    }
+
+    /// Revoke a client-scoped role from a user.
+    pub async fn revoke_client_role(
+        &self,
+        user_id: &str,
+        client_id: &str,
+        role: &str,
+    ) -> anyhow::Result<()> {
+        let sql = self
+            .q("DELETE FROM user_client_roles WHERE user_id = ? AND client_id = ? AND role = ?");
+        sqlx::query(&sql)
+            .bind(user_id)
+            .bind(client_id)
+            .bind(role)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// All client-scoped roles granted to a user, as (client_id, role) pairs.
+    pub async fn client_roles_for_user(
+        &self,
+        user_id: &str,
+    ) -> anyhow::Result<Vec<(String, String)>> {
+        let sql = self.q("SELECT client_id, role FROM user_client_roles WHERE user_id = ?");
+        let rows = sqlx::query(&sql)
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .iter()
+            .map(|r| (r.get::<String, _>("client_id"), r.get::<String, _>("role")))
+            .collect())
     }
 
     // ---- client secrets ----------------------------------------------------
@@ -909,6 +988,11 @@ fn row_to_client(r: &AnyRow) -> Client {
         resources: serde_json::from_str(&resources).unwrap_or_default(),
         policies: serde_json::from_str(&policies).unwrap_or_default(),
         require_mfa: r.try_get("require_mfa").unwrap_or(0) != 0,
+        client_roles: serde_json::from_str(
+            &r.try_get::<String, _>("client_roles")
+                .unwrap_or_else(|_| "[]".into()),
+        )
+        .unwrap_or_default(),
         created_at: r.get("created_at"),
     }
 }

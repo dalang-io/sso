@@ -134,6 +134,7 @@ pub async fn create(
         enable_authorization: false,
         resources: vec![],
         policies: vec![],
+        client_roles: vec![],
         require_mfa: false,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
@@ -436,4 +437,75 @@ fn parse_lines(input: &str) -> Vec<String> {
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty() && seen.insert(l.clone()))
         .collect()
+}
+
+/// Form for the per-client role catalog (line-based, one role name per line).
+#[derive(Deserialize)]
+pub struct ClientRolesForm {
+    pub roles: String,
+}
+
+/// POST /dashboard/clients/:id/roles — save the role catalog.
+/// Managers + super only.
+pub async fn update_client_roles(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<ClientRolesForm>,
+) -> AppResult<impl IntoResponse> {
+    let admin = require_admin(&state, &jar).await?;
+    client_in_scope(&state, &admin, &id).await?;
+    if !admin.can_manage_clients() {
+        return Err(AppError::Forbidden);
+    }
+    let roles = parse_lines(&form.roles);
+    state.db.update_client_roles(&id, &roles).await?;
+    Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
+}
+
+/// A grant or revoke action for one role on one end user (by email).
+#[derive(Deserialize)]
+pub struct ClientRoleAction {
+    pub email: String,
+    pub role: String,
+    #[serde(default)]
+    pub action: String,
+}
+
+/// POST /dashboard/clients/:id/grant — grant (or revoke) a role by user email.
+/// Managers + super only.
+pub async fn grant_role(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<ClientRoleAction>,
+) -> AppResult<impl IntoResponse> {
+    let admin = require_admin(&state, &jar).await?;
+    let client = client_in_scope(&state, &admin, &id).await?;
+    if !admin.can_manage_clients() {
+        return Err(AppError::Forbidden);
+    }
+    let email = form.email.trim().to_string();
+    let role = form.role.trim().to_string();
+    if email.is_empty() {
+        return Err(AppError::bad("enter an email address"));
+    }
+    if role.is_empty() {
+        return Err(AppError::bad("select a role"));
+    }
+    let Some(user) = state.db.user_by_email(&email).await? else {
+        return Err(AppError::bad("no such user"));
+    };
+    if form.action == "revoke" {
+        state
+            .db
+            .revoke_client_role(&user.id, &client.client_id, &role)
+            .await?;
+    } else {
+        state
+            .db
+            .grant_client_role(&user.id, &client.client_id, &role)
+            .await?;
+    }
+    Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
 }

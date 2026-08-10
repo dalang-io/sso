@@ -80,6 +80,13 @@ pub async fn detail(
         _ => (String::new(), String::new(), None),
     };
 
+    let clients = state.db.list_clients().await?;
+    let grants = state.db.client_roles_for_user(&user.id).await?;
+    let mut grants_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (cid, r) in &grants {
+        grants_map.entry(cid.clone()).or_default().push(r.clone());
+    }
+
     let body = state.render(
         "user_detail.html",
         context! {
@@ -93,6 +100,8 @@ pub async fn detail(
             totp_secret => totp_secret,
             totp_uri => totp_uri,
             totp_qr => totp_qr,
+            clients => clients,
+            grants_map => grants_map,
         },
     )?;
     Ok(Html(body))
@@ -284,4 +293,48 @@ mod tests {
         assert!(!attrs_is_invalid("alright=1\nfine=2"));
         assert!(!attrs_is_invalid(""));
     }
+}
+
+#[derive(Deserialize)]
+pub struct ClientRoleForm {
+    pub client_id: String,
+    pub role: String,
+    pub action: String,
+}
+
+/// POST /dashboard/users/:id/client-role — grant or revoke a client-scoped role.
+pub async fn update_client_role(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<ClientRoleForm>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+
+    let client_id = form.client_id.trim().to_string();
+    let role = form.role.trim().to_string();
+    let action = form.action.trim().to_string();
+
+    if client_id.is_empty() || role.is_empty() {
+        return Err(AppError::bad("client and role must not be empty"));
+    }
+
+    if action == "revoke" {
+        state
+            .db
+            .revoke_client_role(&user.id, &client_id, &role)
+            .await?;
+        tracing::info!(user = %user.email, %client_id, %role, "client role revoked by admin");
+    } else if action == "grant" {
+        state
+            .db
+            .grant_client_role(&user.id, &client_id, &role)
+            .await?;
+        tracing::info!(user = %user.email, %client_id, %role, "client role granted by admin");
+    } else {
+        return Err(AppError::bad("action must be \"grant\" or \"revoke\""));
+    }
+
+    Ok(Redirect::to(&format!("/dashboard/users/{}", user.id)))
 }

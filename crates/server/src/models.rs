@@ -175,6 +175,8 @@ pub struct Client {
     pub resources: Vec<ClientResource>,
     /// Who may access which resources, keyed on the user's roles/groups.
     pub policies: Vec<Policy>,
+    /// This client's own role catalog (Keycloak client roles), by name.
+    pub client_roles: Vec<String>,
     /// When true, every end user signing in to this client must have (and use)
     /// two-factor authentication.
     pub require_mfa: bool,
@@ -423,6 +425,7 @@ mod tests {
                     groups: vec![],
                 },
             ],
+            client_roles: vec![],
             require_mfa: false,
             created_at: "".into(),
         }

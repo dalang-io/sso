@@ -79,6 +79,10 @@ pub struct Claims {
     /// only on access tokens when the client has it enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization: Option<serde_json::Value>,
+    /// Client-scoped roles (Keycloak `resource_access`), present on access
+    /// tokens for a user's grants on the issuing client.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_access: Option<serde_json::Value>,
 }
 
 /// Sign a claim set as an RS256 JWT with the active `kid` (classical backend).

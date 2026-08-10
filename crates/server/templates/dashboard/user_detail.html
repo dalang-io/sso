@@ -68,6 +68,41 @@
 </div>
 
 <div class="panel mt">
+  <h2 style="margin:0 0 1rem">Client roles</h2>
+  {% if clients | selectattr("client_roles") | list | length %}
+  {% for c in clients if c.client_roles %}
+  <div class="mb">
+    <div class="mono small">{{ c.client_id }}</div>
+    {% for r in c.client_roles %}
+    {% set uroles = grants_map[c.client_id] if grants_map[c.client_id] is defined else [] %}
+    <div class="row between mb">
+      <span class="mono">{{ r }}</span>
+      {% if r in uroles %}
+      <form method="post" action="/dashboard/users/{{ user.id }}/client-role"
+            data-confirm="Revoke role `{{ r }}` on {{ c.client_id }} from {{ user.email }}?">
+        <input type="hidden" name="client_id" value="{{ c.client_id }}" />
+        <input type="hidden" name="role" value="{{ r }}" />
+        <input type="hidden" name="action" value="revoke" />
+        <button class="btn btn-sm link-danger">Revoke</button>
+      </form>
+      {% else %}
+      <form method="post" action="/dashboard/users/{{ user.id }}/client-role">
+        <input type="hidden" name="client_id" value="{{ c.client_id }}" />
+        <input type="hidden" name="role" value="{{ r }}" />
+        <input type="hidden" name="action" value="grant" />
+        <button class="btn btn-sm">Grant</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="hint" style="margin:0">No clients define roles yet.</p>
+  {% endif %}
+</div>
+
+<div class="panel mt">
   <h2 style="margin:0 0 1rem">Account status &amp; password</h2>
   <div class="row between mb">
     <div>

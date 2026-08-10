@@ -270,6 +270,24 @@ async fn issue(
             .await?;
     }
 
+    // Client-scoped roles (resource_access): the user's grants on THIS client.
+    let resource_access = match &user {
+        Some(u) => {
+            let grants = state.db.client_roles_for_user(&u.id).await?;
+            let roles: Vec<String> = grants
+                .iter()
+                .filter(|(cid, _)| cid == &client.client_id)
+                .map(|(_, role)| role.clone())
+                .collect();
+            if roles.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({ client.client_id.clone(): { "roles": roles } }))
+            }
+        }
+        None => None,
+    };
+
     let access = state
         .signer
         .sign(&Claims {
@@ -285,6 +303,7 @@ async fn issue(
             groups: groups.clone(),
             attributes: attributes.clone(),
             authorization: authorization.clone(),
+            resource_access: resource_access.clone(),
         })
         .map_err(AppError::Other)?;
 
@@ -305,6 +324,7 @@ async fn issue(
                     groups,
                     attributes,
                     authorization: None,
+                    resource_access: None,
                 })
                 .map_err(AppError::Other)?,
         )

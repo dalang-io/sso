@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS user_groups (
     name VARCHAR(64) NOT NULL UNIQUE
 );
 
+-- Per-user grants of client-scoped roles (Keycloak-style client roles). Role
+-- names reference a client's `client_roles` catalog.
+CREATE TABLE IF NOT EXISTS user_client_roles (
+    user_id   VARCHAR(36) NOT NULL,
+    client_id VARCHAR(64) NOT NULL,
+    role      VARCHAR(64) NOT NULL,
+    PRIMARY KEY (user_id, client_id, role)
+);
+
 CREATE TABLE IF NOT EXISTS clients (
     id                 VARCHAR(36)  PRIMARY KEY,
     client_id          VARCHAR(64)  NOT NULL UNIQUE,
@@ -79,6 +88,9 @@ CREATE TABLE IF NOT EXISTS clients (
     resources          TEXT         NOT NULL DEFAULT '[]',
     -- JSON array of policies: [{name, resources:[...], roles:[...], groups:[...]}].
     policies           TEXT         NOT NULL DEFAULT '[]',
+    -- Per-client role catalog (Keycloak client roles). JSON array of role names
+    -- this client defines; users are granted them via user_client_roles.
+    client_roles       TEXT         NOT NULL DEFAULT '[]',
     -- Require every signing-in end user to have (and use) TOTP 2FA.
     require_mfa        INTEGER      NOT NULL DEFAULT 0,
     created_at         VARCHAR(40)  NOT NULL

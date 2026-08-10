@@ -36,6 +36,11 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/clients/:id", get(clients::detail))
         .route("/dashboard/clients/:id/uris", post(clients::update_uris))
         .route("/dashboard/clients/:id/authz", post(clients::update_authz))
+        .route(
+            "/dashboard/clients/:id/roles",
+            post(clients::update_client_roles),
+        )
+        .route("/dashboard/clients/:id/grant", post(clients::grant_role))
         .route("/dashboard/clients/:id/secrets", post(clients::add_secret))
         .route(
             "/dashboard/clients/:id/secrets/:sid/delete",
@@ -66,6 +71,10 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/users/:id/enable", post(users::enable_user))
         .route("/dashboard/users/:id/disable", post(users::disable_user))
         .route("/dashboard/users/:id/password", post(users::reset_password))
+        .route(
+            "/dashboard/users/:id/client-role",
+            post(users::update_client_role),
+        )
         // super-admin: role catalog
         .route("/dashboard/roles", get(roles::list).post(roles::create))
         .route("/dashboard/roles/:name/delete", post(roles::delete))
