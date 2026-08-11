@@ -101,6 +101,7 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN policies TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE clients ADD COLUMN require_mfa INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE clients ADD COLUMN client_roles TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE clients ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)",
             "ALTER TABLE users ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
         ] {
@@ -374,6 +375,15 @@ impl Db {
         Ok(res.rows_affected() > 0)
     }
 
+    /// Delete an end user and their dependent rows. Returns `false` if absent.
+    pub async fn delete_user(&self, id: &str) -> anyhow::Result<bool> {
+        let sql = self.q("DELETE FROM users WHERE id = ?");
+        let res = sqlx::query(&sql).bind(id).execute(&self.pool).await?;
+        let csql = self.q("DELETE FROM user_client_roles WHERE user_id = ?");
+        sqlx::query(&csql).bind(id).execute(&self.pool).await?;
+        Ok(res.rows_affected() > 0)
+    }
+
     /// Add `role` to a user's roles (by email). No-op if already present.
     pub async fn assign_role_to_user(&self, email: &str, role: &str) -> anyhow::Result<()> {
         self.add_to_user_list(email, "roles", role).await
@@ -596,8 +606,8 @@ impl Db {
         // compatibility; secrets now live in `client_secrets`. Bind an empty value.
         let sql = self.q("INSERT INTO clients \
              (id, client_id, client_secret_hash, tenant_id, name, js_origins, redirect_uris, allowed_emails, \
-              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, client_roles, require_mfa, created_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+              include_roles, include_groups, include_attributes, enable_authorization, resources, policies, client_roles, require_mfa, enabled, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sqlx::query(&sql)
             .bind(&client.id)
             .bind(&client.client_id)
@@ -615,6 +625,7 @@ impl Db {
             .bind(serde_json::to_string(&client.policies)?)
             .bind(serde_json::to_string(&client.client_roles)?)
             .bind(client.require_mfa as i32)
+            .bind(client.enabled as i32)
             .bind(&client.created_at)
             .execute(&self.pool)
             .await?;
@@ -668,6 +679,17 @@ impl Db {
         let sql = self.q("UPDATE clients SET client_roles = ? WHERE id = ?");
         sqlx::query(&sql)
             .bind(serde_json::to_string(roles)?)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Enable or disable a client. Disabled clients cannot authorize/token.
+    pub async fn set_client_enabled(&self, id: &str, enabled: bool) -> anyhow::Result<()> {
+        let sql = self.q("UPDATE clients SET enabled = ? WHERE id = ?");
+        sqlx::query(&sql)
+            .bind(enabled as i32)
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -988,6 +1010,7 @@ fn row_to_client(r: &AnyRow) -> Client {
         resources: serde_json::from_str(&resources).unwrap_or_default(),
         policies: serde_json::from_str(&policies).unwrap_or_default(),
         require_mfa: r.try_get("require_mfa").unwrap_or(0) != 0,
+        enabled: r.try_get("enabled").unwrap_or(1) != 0,
         client_roles: serde_json::from_str(
             &r.try_get::<String, _>("client_roles")
                 .unwrap_or_else(|_| "[]".into()),

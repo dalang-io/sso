@@ -8,18 +8,39 @@
   into their id/access tokens, so your apps can enforce per-user access.
 </p>
 
+<div class="panel mb-lg">
+  <h2>Create user</h2>
+  <form method="post" action="/dashboard/users" class="stack">
+    <div class="grid-2">
+      <div class="field" style="margin:0">
+        <label class="label">Email</label>
+        <input class="input" name="email" type="email" required placeholder="user@example.com" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label">Password</label>
+        <input class="input" name="password" type="password" required placeholder="At least 8 characters" />
+      </div>
+    </div>
+    <div><button class="btn btn-primary">Create user</button></div>
+  </form>
+</div>
+
 {% if users %}
 <div class="table-scroll">
   <table class="table">
-    <thead><tr><th>Email</th><th>Roles</th><th>Groups</th><th></th></tr></thead>
+    <thead><tr><th>Email</th><th>Roles</th><th>Groups</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for u in users %}
       <tr>
         <td>{{ u.email }}</td>
         <td class="small">{{ u.roles|join(", ") if u.roles else "—" }}</td>
         <td class="small">{{ u.groups|join(", ") if u.groups else "—" }}</td>
+        <td>{% if u.enabled %}<span class="badge badge-primary">enabled</span>{% else %}<span class="badge badge-neutral">disabled</span>{% endif %}</td>
         <td style="text-align:right">
           <a class="btn btn-sm btn-secondary" href="/dashboard/users/{{ u.id }}">Edit</a>
+          <form method="post" action="/dashboard/users/{{ u.id }}/delete" data-confirm="Delete user {{ u.email }}? This removes their account, grants and sessions.">
+            <button class="link-danger">Delete</button>
+          </form>
         </td>
       </tr>
       {% endfor %}

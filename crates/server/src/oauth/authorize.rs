@@ -82,6 +82,9 @@ pub(super) async fn validate(state: &AppState, p: &AuthzParams) -> AppResult<Cli
         .client_by_client_id(&p.client_id)
         .await?
         .ok_or_else(|| AppError::oauth("invalid_client", "unknown client_id"))?;
+    if !client.enabled {
+        return Err(AppError::oauth("invalid_client", "client is disabled"));
+    }
     if !client.redirect_uris.iter().any(|u| u == &p.redirect_uri) {
         return Err(AppError::oauth(
             "invalid_request",

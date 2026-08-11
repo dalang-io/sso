@@ -381,6 +381,9 @@ pub async fn authenticate_client(
         .client_by_client_id(&id)
         .await?
         .ok_or_else(|| AppError::oauth("invalid_client", "unknown client"))?;
+    if !client.enabled {
+        return Err(AppError::oauth("invalid_client", "client is disabled"));
+    }
     // A client may hold up to two secrets (for rotation); accept any live one.
     let secrets = state.db.list_client_secrets(&client.id).await?;
     let ok = secrets

@@ -41,6 +41,7 @@ pub fn router() -> Router<AppState> {
             post(clients::update_client_roles),
         )
         .route("/dashboard/clients/:id/grant", post(clients::grant_role))
+        .route("/dashboard/clients/:id/enabled", post(clients::set_enabled))
         .route("/dashboard/clients/:id/secrets", post(clients::add_secret))
         .route(
             "/dashboard/clients/:id/secrets/:sid/delete",
@@ -60,9 +61,13 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/members/:id/delete", post(admin::delete_member))
         .route("/dashboard/members/:id/role", post(admin::update_role))
         // super-admin: end-user fine-grained authorization
-        .route("/dashboard/users", get(users::list))
+        .route(
+            "/dashboard/users",
+            get(users::list).post(users::create_admin_user),
+        )
         .route("/dashboard/users/:id", get(users::detail))
         .route("/dashboard/users/:id/update", post(users::update))
+        .route("/dashboard/users/:id/delete", post(users::delete_user))
         .route("/dashboard/users/:id/totp/enable", post(users::enable_totp))
         .route(
             "/dashboard/users/:id/totp/disable",

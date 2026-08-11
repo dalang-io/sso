@@ -136,6 +136,7 @@ pub async fn create(
         policies: vec![],
         client_roles: vec![],
         require_mfa: false,
+        enabled: true,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     state.db.create_client(&client).await?;
@@ -507,5 +508,30 @@ pub async fn grant_role(
             .grant_client_role(&user.id, &client.client_id, &role)
             .await?;
     }
+    Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
+}
+
+/// Form for the client enable/disable toggle. A checkbox sends its value only
+/// when checked; absent => disabled.
+#[derive(Deserialize)]
+pub struct EnabledForm {
+    pub enabled: Option<String>,
+}
+
+/// POST /dashboard/clients/:id/enabled — enable/disable a client (Keycloak-style).
+/// Managers + super only.
+pub async fn set_enabled(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<EnabledForm>,
+) -> AppResult<impl IntoResponse> {
+    let admin = require_admin(&state, &jar).await?;
+    client_in_scope(&state, &admin, &id).await?;
+    if !admin.can_manage_clients() {
+        return Err(AppError::Forbidden);
+    }
+    let enabled = form.enabled.is_some();
+    state.db.set_client_enabled(&id, enabled).await?;
     Ok(Redirect::to(&format!("/dashboard/clients/{id}")))
 }

@@ -9,6 +9,30 @@
   <div class="mono break">{{ client.client_id }}</div>
 </div>
 
+{% if can_manage %}
+{% if client.enabled %}
+<div class="panel-muted mb-lg">
+  <div class="row between">
+    <div>
+      <p style="margin:0">Client is <strong>Enabled</strong></p>
+      <p class="hint" style="margin:.25rem 0 0">This client can authorize and issue tokens. Toggling it off immediately refuses sign-in and token requests.</p>
+    </div>
+    <form method="post" action="/dashboard/clients/{{ client.id }}/enabled">
+      <button class="btn btn-sm btn-danger">Disable</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-warning mb-lg">
+  <p style="margin:0">Client is <strong>Disabled</strong> — tokens and sign-in are refused.</p>
+  <form method="post" action="/dashboard/clients/{{ client.id }}/enabled" style="margin-top:.5rem">
+    <input type="hidden" name="enabled" value="1" />
+    <button class="btn btn-sm btn-primary">Enable</button>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+
 <!-- Client secrets: up to 2, each with its own creation date, so a secret can
      be rotated (add new, delete old) without recreating the client. -->
 <div class="panel mb-lg">

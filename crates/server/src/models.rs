@@ -180,6 +180,8 @@ pub struct Client {
     /// When true, every end user signing in to this client must have (and use)
     /// two-factor authentication.
     pub require_mfa: bool,
+    /// Whether this client may authorize/issue tokens (Keycloak "Enabled").
+    pub enabled: bool,
     pub created_at: String,
 }
 
@@ -427,6 +429,7 @@ mod tests {
             ],
             client_roles: vec![],
             require_mfa: false,
+            enabled: true,
             created_at: "".into(),
         }
     }

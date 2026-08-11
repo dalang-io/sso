@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS clients (
     client_roles       TEXT         NOT NULL DEFAULT '[]',
     -- Require every signing-in end user to have (and use) TOTP 2FA.
     require_mfa        INTEGER      NOT NULL DEFAULT 0,
+    -- Whether this client may authorize/token (Keycloak "Enabled"); 0 = disabled.
+    enabled            INTEGER      NOT NULL DEFAULT 1,
     created_at         VARCHAR(40)  NOT NULL
 );
 

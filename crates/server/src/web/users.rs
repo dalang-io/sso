@@ -338,3 +338,49 @@ pub async fn update_client_role(
 
     Ok(Redirect::to(&format!("/dashboard/users/{}", user.id)))
 }
+
+#[derive(Deserialize)]
+pub struct CreateUserForm {
+    pub email: String,
+    pub password: String,
+}
+
+/// POST /dashboard/users — provision a new end user.
+pub async fn create_admin_user(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Form(form): Form<CreateUserForm>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let email = form.email.trim();
+    let pw = form.password.trim();
+    if !email.contains('@') {
+        return Err(AppError::bad("enter a valid email address"));
+    }
+    if pw.len() < 8 {
+        return Err(AppError::bad("password must be at least 8 characters"));
+    }
+    if state.db.user_by_email(email).await?.is_some() {
+        return Err(AppError::bad("a user with that email already exists"));
+    }
+    state.db.create_user(email, pw).await?;
+    tracing::info!(email, "end user created by admin");
+    Ok(Redirect::to("/dashboard/users"))
+}
+
+/// POST /dashboard/users/:id/delete — remove an end user's account.
+pub async fn delete_user(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    state
+        .db
+        .write_audit(&user.email, "delete_user", "", None)
+        .await?;
+    state.db.delete_user(&id).await?;
+    tracing::warn!(email = %user.email, "end user deleted by admin");
+    Ok(Redirect::to("/dashboard/users"))
+}
