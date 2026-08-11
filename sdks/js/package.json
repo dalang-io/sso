@@ -11,12 +11,18 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "node init && tsc -p tsconfig.json"
   },
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/dalang-io/sso" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dalang-io/sso"
+  },
   "devDependencies": {
     "typescript": "^5.4.0"
   }

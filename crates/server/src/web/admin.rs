@@ -220,3 +220,47 @@ pub async fn update_role(
     }
     Ok(Redirect::to("/dashboard/members"))
 }
+
+pub async fn settings(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+) -> AppResult<Html<String>> {
+    let admin = require_super(&state, &jar).await?;
+
+    let user_count = state.db.list_users().await?.len() as i64;
+    let client_count = state.db.list_clients().await?.len() as i64;
+    let role_count = state.db.list_roles().await?.len() as i64;
+    let group_count = state.db.list_groups().await?.len() as i64;
+    let session_count = state.db.list_sessions().await?.len() as i64;
+    let member_count = state.db.count_admins().await?;
+
+    let db_driver = if state.config.database_url.starts_with("postgres") {
+        "PostgreSQL"
+    } else if state.config.database_url.starts_with("mysql") {
+        "MySQL/MariaDB"
+    } else {
+        "SQLite"
+    };
+
+    let body = state.render(
+        "settings.html",
+        context! {
+            admin_email => admin.email,
+            admin_role => admin.role,
+            issuer => state.config.issuer(),
+            db_driver => db_driver,
+            signing_alg => state.config.token_signing_alg,
+            cookie_secure => if state.config.cookie_secure { "yes" } else { "no" },
+            access_ttl => state.config.access_token_ttl.as_secs(),
+            refresh_ttl => state.config.refresh_token_ttl.as_secs(),
+            auth_code_ttl => state.config.auth_code_ttl.as_secs(),
+            user_count => user_count,
+            client_count => client_count,
+            role_count => role_count,
+            group_count => group_count,
+            session_count => session_count,
+            member_count => member_count,
+        },
+    )?;
+    Ok(Html(body))
+}

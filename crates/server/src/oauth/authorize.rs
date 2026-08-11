@@ -104,12 +104,21 @@ pub struct MfaStep {
     pub error: Option<String>,
 }
 
-/// Render the end-user login/registration screen, preserving the OAuth request.
-pub(super) fn render_login(
+/// State for the "you must set a new password" (required action) step.
+#[derive(Serialize)]
+pub struct ForcePwStep {
+    pub email: String,
+    pub password: String,
+    pub error: Option<String>,
+}
+
+fn render_oauth_login(
     state: &AppState,
     client: &Client,
     p: &AuthzParams,
     error: Option<&str>,
+    mfa: Option<MfaStep>,
+    force_pw: Option<ForcePwStep>,
 ) -> AppResult<Html<String>> {
     let body = state.render(
         "oauth_login.html",
@@ -117,10 +126,21 @@ pub(super) fn render_login(
             client_name => client.name,
             params => p.to_map(),
             error => error,
-            mfa => None::<MfaStep>,
+            mfa => mfa,
+            force_pw => force_pw,
         },
     )?;
     Ok(Html(body))
+}
+
+/// Render the end-user login/registration screen, preserving the OAuth request.
+pub(super) fn render_login(
+    state: &AppState,
+    client: &Client,
+    p: &AuthzParams,
+    error: Option<&str>,
+) -> AppResult<Html<String>> {
+    render_oauth_login(state, client, p, error, None, None)
 }
 
 /// Render the two-factor step of the login screen.
@@ -130,16 +150,30 @@ pub(super) fn render_mfa_login(
     p: &AuthzParams,
     mfa: MfaStep,
 ) -> AppResult<Html<String>> {
-    let body = state.render(
-        "oauth_login.html",
-        context! {
-            client_name => client.name,
-            params => p.to_map(),
-            error => None::<&str>,
-            mfa => Some(mfa),
-        },
-    )?;
-    Ok(Html(body))
+    render_oauth_login(state, client, p, None, Some(mfa), None)
+}
+
+/// Render the "set a new password" (force change) step of the login screen.
+pub(super) fn render_force_pw_login(
+    state: &AppState,
+    client: &Client,
+    p: &AuthzParams,
+    email: String,
+    password: String,
+    error: Option<String>,
+) -> AppResult<Html<String>> {
+    render_oauth_login(
+        state,
+        client,
+        p,
+        None,
+        None,
+        Some(ForcePwStep {
+            email,
+            password,
+            error,
+        }),
+    )
 }
 
 /// Render the consent screen for an already-authenticated user.

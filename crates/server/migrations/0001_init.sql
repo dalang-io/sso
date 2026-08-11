@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS users (
     -- Base32 TOTP secret; NULL = two-factor authentication not enrolled.
     totp_secret  VARCHAR(64),
     -- Whether the account may sign in (Keycloak "enabled"); 0 = disabled.
-    enabled      INTEGER NOT NULL DEFAULT 1
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    -- Require the user to set a new password at next sign-in (Keycloak
+    -- "required action"); cleared once they do.
+    force_pw_change INTEGER NOT NULL DEFAULT 0
 );
 
 -- Role catalog (Keycloak-style entity). A user "has" a role by name in their

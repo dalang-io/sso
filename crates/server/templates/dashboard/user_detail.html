@@ -130,5 +130,21 @@
     </div>
     <div><button class="btn btn-primary">Set new password</button></div>
   </form>
+  <hr class="mt" />
+  <div class="field">
+    <label class="label">Password change</label>
+    {% if user.force_pw_change %}
+    <p class="hint mb">User must set a new password at next sign-in.</p>
+    <form method="post" action="/dashboard/users/{{ user.id }}/force-pw">
+      <button class="btn btn-sm link-danger">Cancel required password change</button>
+    </form>
+    {% else %}
+    <p class="hint mb">Require this user to set a new password on their next sign-in.</p>
+    <form method="post" action="/dashboard/users/{{ user.id }}/force-pw">
+      <input type="hidden" name="force" value="1" />
+      <button class="btn btn-sm btn-secondary">Force password change at next sign-in</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

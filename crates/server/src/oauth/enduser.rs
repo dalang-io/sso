@@ -7,7 +7,8 @@
 //! to the consent screen carrying the original OAuth request via [`AuthzParams`].
 
 use super::authorize::{
-    render_consent, render_login, render_mfa_login, validate, AuthzParams, MfaStep,
+    render_consent, render_force_pw_login, render_login, render_mfa_login, validate, AuthzParams,
+    MfaStep,
 };
 use crate::error::AppResult;
 use crate::models::User;
@@ -49,6 +50,11 @@ pub struct CredsForm {
     /// Present on the two-factor step: the TOTP code.
     #[serde(default)]
     pub mfa_code: String,
+    /// Present on the forced-password-change step.
+    #[serde(default)]
+    pub fpw_new: String,
+    #[serde(default)]
+    pub fpw_confirm: String,
 }
 
 /// POST /oauth/login — authenticate an existing end user, then show consent.
@@ -129,6 +135,33 @@ pub async fn login(
 
     // Fully authenticated (password + MFA satisfied) — reset the lockout budget.
     state.rate_limiter.clear(&format!("acct:{}", user.email));
+
+    // Required action: force password change on next login.
+    if user.force_pw_change {
+        let err = if f.fpw_new.is_empty() {
+            None
+        } else if f.fpw_new.len() < MIN_PASSWORD_LEN {
+            Some("New password must be at least 8 characters.".into())
+        } else if f.fpw_new != f.fpw_confirm {
+            Some("New passwords do not match.".into())
+        } else {
+            state.db.update_user_password(&user.id, &f.fpw_new).await?;
+            state.db.set_force_pw_change(&user.id, false).await?;
+            None
+        };
+        if let Some(e) = err {
+            return Ok(render_force_pw_login(
+                &state,
+                &client,
+                &f.params,
+                user.email.clone(),
+                f.password.clone(),
+                Some(e),
+            )?
+            .into_response());
+        }
+        // Password updated successfully — fall through to normal completion.
+    }
 
     // Now check this client's email allow-list.
     if !client.email_allowed(&user.email) {
