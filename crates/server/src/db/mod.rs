@@ -104,6 +104,7 @@ impl Db {
             "ALTER TABLE clients ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)",
             "ALTER TABLE users ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE users ADD COLUMN force_pw_change INTEGER NOT NULL DEFAULT 0",
         ] {
             let _ = sqlx::query(alter).execute(&self.pool).await;
         }
@@ -279,6 +280,7 @@ impl Db {
             attributes: std::collections::BTreeMap::new(),
             totp_secret: None,
             enabled: true,
+            force_pw_change: false,
         };
         // `roles/groups/attributes` default to '[]'/'{}' via the schema; a fresh
         // account has no fine-grained authorization until an admin assigns it.
@@ -369,6 +371,18 @@ impl Db {
         let sql = self.q("UPDATE users SET enabled = ? WHERE id = ?");
         let res = sqlx::query(&sql)
             .bind(enabled as i32)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    /// Set whether a user must change their password at next sign-in.
+    /// Returns `false` if not found.
+    pub async fn set_force_pw_change(&self, id: &str, force: bool) -> anyhow::Result<bool> {
+        let sql = self.q("UPDATE users SET force_pw_change = ? WHERE id = ?");
+        let res = sqlx::query(&sql)
+            .bind(force as i32)
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -1061,6 +1075,7 @@ fn row_to_user(r: &AnyRow) -> User {
         attributes: json_object(r, "attributes"),
         totp_secret: r.try_get("totp_secret").ok(),
         enabled: r.try_get("enabled").unwrap_or(1) != 0,
+        force_pw_change: r.try_get("force_pw_change").unwrap_or(0) != 0,
     }
 }
 

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ brand_title }}{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="muted small mb-lg">Read-only summary of this instance and its realm.</p>
+
+<div class="panel mb-lg">
+  <h2>Instance</h2>
+  <div class="table-scroll">
+    <table class="table">
+      <tbody>
+        <tr>
+          <td>Public URL</td>
+          <td class="mono">{{ brand_title }}</td>
+        </tr>
+        <tr>
+          <td>OIDC issuer</td>
+          <td class="mono">{{ issuer }}</td>
+        </tr>
+        <tr>
+          <td>Database</td>
+          <td><span class="badge">{{ db_driver }}</span></td>
+        </tr>
+        <tr>
+          <td>Token signing</td>
+          <td class="mono">{{ signing_alg }}</td>
+        </tr>
+        <tr>
+          <td>Secure cookies</td>
+          <td>{{ cookie_secure }}</td>
+        </tr>
+        <tr>
+          <td>Access token TTL</td>
+          <td class="mono">{{ access_ttl }} s</td>
+        </tr>
+        <tr>
+          <td>Refresh token TTL</td>
+          <td class="mono">{{ refresh_ttl }} s</td>
+        </tr>
+        <tr>
+          <td>Authorization code TTL</td>
+          <td class="mono">{{ auth_code_ttl }} s</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel mb-lg">
+  <h2>Realm</h2>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Object</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>Members</td><td class="mono">{{ member_count }}</td></tr>
+        <tr><td>End users</td><td class="mono">{{ user_count }}</td></tr>
+        <tr><td>Clients</td><td class="mono">{{ client_count }}</td></tr>
+        <tr><td>Roles</td><td class="mono">{{ role_count }}</td></tr>
+        <tr><td>Groups</td><td class="mono">{{ group_count }}</td></tr>
+        <tr><td>Active sessions</td><td class="mono">{{ session_count }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

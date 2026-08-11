@@ -384,3 +384,24 @@ pub async fn delete_user(
     tracing::warn!(email = %user.email, "end user deleted by admin");
     Ok(Redirect::to("/dashboard/users"))
 }
+
+#[derive(Deserialize)]
+pub struct ForcePwForm {
+    pub force: Option<String>,
+}
+
+/// POST /dashboard/users/:id/force-pw — set or clear "force password change on
+/// next login" (a Keycloak-style required action).
+pub async fn set_force_pw(
+    State(state): State<AppState>,
+    jar: SignedCookieJar,
+    Path(id): Path<String>,
+    Form(form): Form<ForcePwForm>,
+) -> AppResult<impl IntoResponse> {
+    require_super(&state, &jar).await?;
+    let user = user_in_scope(&state, &id).await?;
+    let force = form.force.is_some();
+    state.db.set_force_pw_change(&id, force).await?;
+    tracing::info!(user = %user.email, force, "force password change updated by admin");
+    Ok(Redirect::to(&format!("/dashboard/users/{id}")))
+}

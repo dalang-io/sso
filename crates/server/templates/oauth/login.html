@@ -16,6 +16,24 @@
     </div>
     <button class="btn btn-primary btn-block">Verify</button>
   </form>
+  {% elif force_pw %}
+  <h1>Set a new password</h1>
+  <p class="muted small mb-lg">To continue to <strong>{{ client_name }}</strong>, choose a new password for your account.</p>
+  {% if force_pw.error %}<div class="alert alert-danger mb">{{ force_pw.error }}</div>{% endif %}
+  <form method="post" action="/oauth/login" class="panel stack">
+    {% for k, v in params|items %}<input type="hidden" name="{{ k }}" value="{{ v }}" />{% endfor %}
+    <input type="hidden" name="email" value="{{ force_pw.email }}" autocomplete="off" />
+    <input type="hidden" name="password" value="{{ force_pw.password }}" autocomplete="off" />
+    <div class="field">
+      <label class="label">New password</label>
+      <input class="input" name="fpw_new" type="password" required placeholder="At least 8 characters" autocomplete="new-password" autofocus />
+    </div>
+    <div class="field">
+      <label class="label">Confirm new password</label>
+      <input class="input" name="fpw_confirm" type="password" required autocomplete="new-password" />
+    </div>
+    <button class="btn btn-primary btn-block">Update password &amp; continue</button>
+  </form>
   {% else %}
   <h1>Sign in to continue</h1>
   <p class="muted small mb-lg">to authorize <strong>{{ client_name }}</strong></p>

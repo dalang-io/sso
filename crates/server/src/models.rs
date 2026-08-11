@@ -93,6 +93,8 @@ pub struct User {
     pub totp_secret: Option<String>,
     /// Whether the account may sign in; `false` = disabled.
     pub enabled: bool,
+    /// Require a new password at next sign-in (Keycloak "required action").
+    pub force_pw_change: bool,
 }
 
 impl User {

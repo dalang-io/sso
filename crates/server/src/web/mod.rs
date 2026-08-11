@@ -80,6 +80,7 @@ pub fn router() -> Router<AppState> {
             "/dashboard/users/:id/client-role",
             post(users::update_client_role),
         )
+        .route("/dashboard/users/:id/force-pw", post(users::set_force_pw))
         // super-admin: role catalog
         .route("/dashboard/roles", get(roles::list).post(roles::create))
         .route("/dashboard/roles/:name/delete", post(roles::delete))
@@ -94,6 +95,8 @@ pub fn router() -> Router<AppState> {
         .route("/dashboard/sessions", get(sessions::list))
         .route("/dashboard/sessions/:id/revoke", post(sessions::revoke))
         .route("/dashboard/audit", get(audit::list))
+        // super-admin: realm settings overview
+        .route("/dashboard/settings", get(admin::settings))
 }
 
 /// Resolve the signed-in admin from the session cookie, or `None`.
